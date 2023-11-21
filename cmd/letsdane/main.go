@@ -19,6 +19,7 @@ import (
 	"github.com/buffrr/hsig0"
 	"github.com/buffrr/letsdane"
 	rs "github.com/buffrr/letsdane/resolver"
+	"github.com/buffrr/letsdane/sync"
 	"github.com/miekg/dns"
 )
 
@@ -33,6 +34,7 @@ var (
 	keyPath        = flag.String("key", "", "filepath to the CA's private key")
 	pass           = flag.String("pass", "", "CA passphrase or use DANE_CA_PASS environment variable to decrypt CA file (if encrypted)")
 	anchor         = flag.String("anchor", "", "path to trust anchor file (default: hardcoded 2017 KSK)")
+	hsd            = flag.String("hsd", "http://127.0.0.1:12037", "url to the hsd node used (default: 'http://127.0.0.1:12037')")
 	verbose        = flag.Bool("verbose", false, "verbose output for debugging")
 	ad             = flag.Bool("skip-dnssec", false, "check ad flag only without dnssec validation")
 	skipICANN      = flag.Bool("skip-icann", false, "skip TLSA lookups for ICANN tlds and include them in the CA name constraints extension")
@@ -252,6 +254,13 @@ func splitHostPortKey(addr string) (hostport string, key *hsig0.PublicKey, err e
 }
 
 func main() {
+	p := getConfPath()
+	jsonPath := path.Join(p, "tree_roots.json")
+
+	go sync.SyncRoots(*hsd, "", jsonPath)
+
+	// prove.VerifyFile("a.pem")
+
 	flag.Parse()
 	if *version {
 		fmt.Printf("Version %s\n", letsdane.Version)
