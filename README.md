@@ -38,8 +38,10 @@ go build -tags unbound
 
 SANE will generate a CA and store it in `~/.sane` when you start it for the first time.
 To start the proxy server:
-    `export HNSD_PATH="~/hnsd/hnsd"`
-   `./sane -r https://easyhandshake.com:8053 -skip-dnssec`
+```
+export HNSD_PATH="~/hnsd/hnsd"
+./sane -r https://easyhandshake.com:8053 -skip-dnssec
+```
 
 Using local Handshake hnsd resolver would result in an error, as it will try to run the second instance of hnsd.
 
