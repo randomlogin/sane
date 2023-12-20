@@ -1,4 +1,4 @@
-package letsdane
+package sane
 
 // based on github.com/google/martian/mitm
 
@@ -193,9 +193,8 @@ func (c *mitmConfig) cert(hostname string) (*tls.Certificate, error) {
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
-		NotBefore: time.
-			Now().Add(-c.validity),
-		NotAfter: time.Now().Add(c.validity),
+		NotBefore:             time.Now().Add(-c.validity),
+		NotAfter:              time.Now().Add(c.validity),
 	}
 
 	if ip := net.ParseIP(hostname); ip != nil {

@@ -1,4 +1,4 @@
-package letsdane
+package sane
 
 // based on github.com/google/martian/mitm
 

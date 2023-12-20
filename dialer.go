@@ -1,15 +1,16 @@
-package letsdane
+package sane
 
 import (
 	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/buffrr/letsdane/resolver"
-	"github.com/miekg/dns"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/miekg/dns"
+	"github.com/randomlogin/sane/resolver"
 )
 
 type dialer struct {
@@ -46,6 +47,7 @@ func (d *dialer) dialTLSContext(ctx context.Context, network string, dst *addrLi
 		ipaddr := net.JoinHostPort(ip.String(), dst.Port)
 		conn, err := tlsDialer.DialContext(ctx, network, ipaddr)
 		if err != nil {
+
 			if err, ok := err.(*tlsError); ok {
 				return nil, err
 			}
@@ -89,7 +91,7 @@ func (d *dialer) resolveAddr(ctx context.Context, addr string) (addrs *addrList,
 	if err != nil {
 		return
 	}
-	addrs.IPs, _, err = d.resolver.LookupIP(ctx, "ip", addrs.Host)
+	addrs.IPs, _, err = d.resolver.LookupIP(ctx, "ip4", addrs.Host)
 	if err != nil {
 		return
 	}

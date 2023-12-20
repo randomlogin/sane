@@ -1,13 +1,10 @@
-package letsdane
+package sane
 
 import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/buffrr/letsdane/proxy"
-	"github.com/buffrr/letsdane/resolver"
-	"github.com/miekg/dns"
 	"html"
 	"io"
 	"log"
@@ -16,6 +13,10 @@ import (
 	"net/http/httputil"
 	"strconv"
 	"time"
+
+	"github.com/miekg/dns"
+	"github.com/randomlogin/sane/proxy"
+	"github.com/randomlogin/sane/resolver"
 )
 
 var (
@@ -35,6 +36,7 @@ type Config struct {
 	Constraints    map[string]struct{}
 	SkipNameChecks bool
 	Verbose        bool
+	RootsPath      string
 
 	// For handling relative urls/non-proxy requests
 	ContentHandler http.Handler
@@ -43,6 +45,7 @@ type Config struct {
 type tunneler struct {
 	mitm        *mitmConfig
 	dialer      *dialer
+	RootsPath   string
 	nameChecks  bool
 	constraints map[string]struct{}
 	logger
@@ -103,7 +106,7 @@ func (h *tunneler) Tunnel(ctx context.Context, clientConn *proxy.Conn, network, 
 	}
 
 	alpn := false
-	daneConfig := newTLSConfig(tlsaDomain, tlsa, h.nameChecks)
+	daneConfig := newTLSConfig(tlsaDomain, tlsa, h.nameChecks, h.RootsPath)
 	if len(hello.SupportedProtos) > 0 {
 		daneConfig.NextProtos = hello.SupportedProtos
 		alpn = true
@@ -129,10 +132,12 @@ func (h *tunneler) Tunnel(ctx context.Context, clientConn *proxy.Conn, network, 
 	}
 
 	clientTLS := tls.Server(clientConn, clientTLSConfig)
+
 	if err := clientTLS.Handshake(); err != nil {
 		if err == io.EOF {
 			return
 		}
+		log.Print("myerr is ", err)
 		h.warnf("client handshake failed: %v", statusErr, addr, err)
 		return
 	}
@@ -144,7 +149,7 @@ func (h *tunneler) Tunnel(ctx context.Context, clientConn *proxy.Conn, network, 
 func (c *Config) NewHandler() (*proxy.Handler, error) {
 	p := &proxy.Handler{}
 
-	mitm, err := newMITMConfig(c.Certificate, c.PrivateKey, c.Validity, "DNSSEC")
+	mitm, err := newMITMConfig(c.Certificate, c.PrivateKey, c.Validity, "Stateless DANE")
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +166,7 @@ func (c *Config) NewHandler() (*proxy.Handler, error) {
 			verbose: c.Verbose,
 		},
 		constraints: c.Constraints,
+		RootsPath:   c.RootsPath,
 	}
 
 	httpProxy := &httputil.ReverseProxy{

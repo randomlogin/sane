@@ -1,12 +1,14 @@
-package letsdane
+package sane
 
 import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/miekg/dns"
 	"net"
 	"time"
+
+	"github.com/miekg/dns"
+	"github.com/randomlogin/sane/prove"
 )
 
 type tlsError struct {
@@ -18,12 +20,13 @@ func (t *tlsError) Error() string {
 }
 
 // newTLSConfig creates a new tls configuration capable of validating DANE.
-func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool) *tls.Config {
+func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, rootsPath string) *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify: true, // lgtm[go/disabled-certificate-check]
-		VerifyConnection:   verifyConnection(rrs, nameCheck),
-		ServerName:         host,
-		MinVersion:         tls.VersionTLS12,
+		// VerifyConnection:   verifyConnection(rrs, nameCheck),
+		VerifyConnection: prove.MyVerifyCertificate(rootsPath),
+		ServerName:       host,
+		MinVersion:       tls.VersionTLS12,
 		// Supported TLS 1.2 cipher suites
 		// Crypto package does automatic cipher suite ordering
 		CipherSuites: []uint16{

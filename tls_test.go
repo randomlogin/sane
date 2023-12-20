@@ -1,11 +1,12 @@
-package letsdane
+package sane
 
 import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"github.com/miekg/dns"
 	"testing"
+
+	"github.com/miekg/dns"
 )
 
 func TestVerifyConnection(t *testing.T) {

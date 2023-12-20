@@ -1,4 +1,4 @@
-package letsdane
+package sane
 
 import (
 	"bufio"

@@ -3,8 +3,9 @@ package resolver
 import (
 	"context"
 	"errors"
-	"github.com/miekg/dns"
 	"net"
+
+	"github.com/miekg/dns"
 )
 
 // Resolver is an interface for representing
@@ -53,6 +54,7 @@ func (r *DefaultResolver) LookupIP(ctx context.Context, network, host string) (i
 		qtypes = []uint16{dns.TypeAAAA}
 	}
 
+	// log.Print("inside lookup ", host)
 	queryFn := func(qtype uint16) {
 		lane <- r.Query(ctx, host, qtype)
 	}
@@ -64,6 +66,7 @@ func (r *DefaultResolver) LookupIP(ctx context.Context, network, host string) (i
 	secure = true
 	for range qtypes {
 		result := <-lane
+		// log.Printf("result %+v", result)
 		// should only be set if all lookups
 		// are secure. If one lookup fails
 		// assume insecure
