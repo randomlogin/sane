@@ -18,7 +18,7 @@ provide path to the executable either via flag or via environment variable `expo
 
 Default directory containing CA files and saved tree roots is `~/.sane/`.
 
-# hnsd 
+## hnsd 
 Internally it uses hnsd to sync tree roots. The initial syncronization might take several minutes. Afterwards, using
 checkpoint, hnsd has to syncrhonize last ~2k roots which usually takes 5 seconds.
 
