@@ -17,6 +17,7 @@ import (
 	"github.com/miekg/dns"
 	"github.com/randomlogin/sane/proxy"
 	"github.com/randomlogin/sane/resolver"
+	"github.com/randomlogin/sane/sync"
 )
 
 var (
@@ -105,8 +106,13 @@ func (h *tunneler) Tunnel(ctx context.Context, clientConn *proxy.Conn, network, 
 		return
 	}
 
+	roots, err := sync.ReadStoredRoots(h.RootsPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	alpn := false
-	daneConfig := newTLSConfig(tlsaDomain, tlsa, h.nameChecks, h.RootsPath)
+	daneConfig := newTLSConfig(tlsaDomain, tlsa, h.nameChecks, roots)
 	if len(hello.SupportedProtos) > 0 {
 		daneConfig.NextProtos = hello.SupportedProtos
 		alpn = true
@@ -137,7 +143,6 @@ func (h *tunneler) Tunnel(ctx context.Context, clientConn *proxy.Conn, network, 
 		if err == io.EOF {
 			return
 		}
-		log.Print("myerr is ", err)
 		h.warnf("client handshake failed: %v", statusErr, addr, err)
 		return
 	}

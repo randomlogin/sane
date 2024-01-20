@@ -54,7 +54,6 @@ func (r *DefaultResolver) LookupIP(ctx context.Context, network, host string) (i
 		qtypes = []uint16{dns.TypeAAAA}
 	}
 
-	// log.Print("inside lookup ", host)
 	queryFn := func(qtype uint16) {
 		lane <- r.Query(ctx, host, qtype)
 	}

@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/url"
 	"os"
@@ -36,7 +37,6 @@ var (
 	anchor             = flag.String("anchor", "", "path to trust anchor file (default: hardcoded 2017 KSK)")
 	hsd                = flag.String("hsd", "", "url to the prefered hsd node")
 	verbose            = flag.Bool("verbose", false, "verbose output for debugging")
-	ad                 = flag.Bool("skip-dnssec", false, "check ad flag only without dnssec validation")
 	skipICANN          = flag.Bool("skip-icann", false, "skip TLSA lookups for ICANN tlds and include them in the CA name constraints extension")
 	validity           = flag.Duration("validity", time.Hour, "window of time generated DANE certificates are valid")
 	skipNameChecks     = flag.Bool("skip-namechecks", false, "disable name checks when matching DANE-EE TLSA reocrds.")
@@ -188,59 +188,6 @@ func exportCA() {
 	}
 }
 
-func setupUnbound() (u *rs.Recursive, err error) {
-	u, err = rs.NewRecursive()
-	if err == rs.ErrUnboundNotAvail {
-		return nil, errors.New("sane has not been compiled with unbound. " +
-			"if you have a local dnssec capable resolver, run with -skip-dnssec")
-	}
-	if err != nil {
-		return
-	}
-	defer func() {
-		if u != nil && err != nil {
-			u.Destroy()
-		}
-	}()
-
-	if *anchor != "" {
-		if err := u.AddTAFile(*anchor); err != nil {
-			return nil, err
-		}
-	} else {
-		// add hardcoded ksk if no anchor is specified
-		if err := u.AddTA(KSK2017); err != nil {
-			return nil, err
-		}
-	}
-
-	if *raddr != "" {
-		addrs := strings.Split(*raddr, " ")
-		for _, r := range addrs {
-			r = strings.TrimSpace(r)
-			if r == "" {
-				continue
-			}
-
-			ip, port, err := net.SplitHostPort(r)
-			if err != nil {
-				port = "53"
-				ip = r
-			}
-
-			if err := u.SetFwd(ip + "@" + port); err != nil {
-				return nil, err
-			}
-		}
-
-		return
-	}
-
-	// falls back to root hints if no /etc/resolv.conf
-	_ = u.ResolvConf("/etc/resolv.conf")
-	return
-}
-
 var errNoKey = errors.New("no key found")
 
 // parses hsd format: key@host:port
@@ -260,7 +207,7 @@ func main() {
 	flag.Parse()
 	p := getConfPath()
 	if *hnsdPath == "" {
-		log.Fatal("Must provide a path to hnsd")
+		log.Fatal("path to hnsd is not provided")
 	}
 	if *hnsdCheckpointPath == "" {
 		home, _ := os.UserHomeDir() //above already fails if it doesn't exist
@@ -303,32 +250,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if *ad {
-		if !sig0 && !secure && !isLoopback(*raddr) {
-			log.Printf("You must have a local dnssec capable resolver to use letsdane securely")
-			log.Printf("'%s' is not a loopback address (insecure)!", *raddr)
-		}
-
-		ad, err := rs.NewStub(*raddr)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if sig0 {
-			ad.Verify = func(m *dns.Msg) error {
-				return hsig0.Verify(m, key)
-			}
-		}
-		resolver = ad
-
-	} else {
-		u, err := setupUnbound()
-		if err != nil {
-			log.Fatalf("unbound: %v", err)
-		}
-		defer u.Destroy()
-
-		resolver = u
+	if !sig0 && !secure && !isLoopback(*raddr) {
+		log.Printf("You must have a local dnssec capable resolver to use letsdane securely")
+		log.Printf("'%s' is not a loopback address (insecure)!", *raddr)
 	}
+
+	ad, err := rs.NewStub(*raddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if sig0 {
+		ad.Verify = func(m *dns.Msg) error {
+			return hsig0.Verify(m, key)
+		}
+	}
+	resolver = ad
 
 	c := &sane.Config{
 		Certificate:    ca,
@@ -340,6 +276,15 @@ func main() {
 		Verbose:        *verbose,
 		RootsPath:      path.Join(p, "roots.json"),
 	}
+	if *verbose {
+		logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     slog.LevelDebug,
+			AddSource: true,
+		})
+		logger := slog.New(logHandler)
+		slog.SetDefault(logger)
+	}
+	// log.D
 
 	log.Printf("Listening on %s", *addr)
 	log.Fatal(c.Run(*addr))

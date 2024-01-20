@@ -34,7 +34,7 @@ const (
 	dnsAddress    = dnsServer + ":" + dnsPort
 	qtype         = "TXT"
 	qclass        = "HS"
-	qname         = "progress.chain.hnsd"
+	qname         = "synced.chain.hnsd"
 	timeToNotify  = 2
 )
 
@@ -67,7 +67,8 @@ func checkIfSynced() (bool, error) {
 	// Check the DNS response for synchronization status
 	if len(response.Answer) > 0 {
 		if txtRecord, ok := response.Answer[0].(*dns.TXT); ok {
-			if txtRecord.Txt[0] == "1.000000" {
+			// slog.Debug("in syncing", txtRecord.Txt)
+			if txtRecord.Txt[0] == "true" {
 				return true, nil
 			}
 		}
@@ -113,7 +114,7 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 		var isSynced bool
 		for {
 			if !isSynced {
-				log.Printf("Waiting %d seconds to finish sync.", timeToNotify)
+				log.Printf("Waiting %d seconds to finish the synchronization of tree roots.", timeToNotify)
 				time.Sleep(timeToNotify * time.Second)
 				isSynced, err = checkIfSynced()
 				if err != nil {
@@ -127,11 +128,11 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 					log.Fatal(err)
 				}
 				if err := cmd.Process.Signal(syscall.SIGINT); err != nil {
-					log.Print("Error killing hnsd: ", err)
+					log.Fatal("Error killing hnsd: ", err)
 				}
 
 				if _, err := cmd.Process.Wait(); err != nil {
-					log.Print("Error waiting hnsd ", err)
+					log.Fatal("Error waiting hnsd ", err)
 				}
 				log.Print("Successfully synced last tree roots")
 				break

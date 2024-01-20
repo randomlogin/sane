@@ -4,11 +4,13 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
 	"github.com/miekg/dns"
 	"github.com/randomlogin/sane/prove"
+	"github.com/randomlogin/sane/sync"
 )
 
 type tlsError struct {
@@ -20,13 +22,12 @@ func (t *tlsError) Error() string {
 }
 
 // newTLSConfig creates a new tls configuration capable of validating DANE.
-func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, rootsPath string) *tls.Config {
+func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, roots *[]sync.BlockInfo) *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify: true, // lgtm[go/disabled-certificate-check]
-		// VerifyConnection:   verifyConnection(rrs, nameCheck),
-		VerifyConnection: prove.MyVerifyCertificate(rootsPath),
-		ServerName:       host,
-		MinVersion:       tls.VersionTLS12,
+		VerifyConnection:   verifyConnection(rrs, nameCheck, roots),
+		ServerName: host,
+		MinVersion: tls.VersionTLS12,
 		// Supported TLS 1.2 cipher suites
 		// Crypto package does automatic cipher suite ordering
 		CipherSuites: []uint16{
@@ -44,12 +45,13 @@ func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, rootsPath string
 }
 
 // verifyConnection returns a function that verifies the given tls connection state using the host and rrs
-func verifyConnection(rrs []*dns.TLSA, nameCheck bool) func(cs tls.ConnectionState) error {
+func verifyConnection(rrs []*dns.TLSA, nameCheck bool, roots *[]sync.BlockInfo) func(cs tls.ConnectionState) error {
 	return func(cs tls.ConnectionState) error {
 		// the host can be ignored per RFC 7671. Not Before, Not After are ignored as well.
 		// https://tools.ietf.org/html/rfc7671
+		cert := cs.PeerCertificates[0]
 		if nameCheck {
-			if err := cs.PeerCertificates[0].VerifyHostname(cs.ServerName); err != nil {
+			if err := cert.VerifyHostname(cs.ServerName); err != nil {
 				return &tlsError{err: fmt.Sprintf("tls: %v", err)}
 			}
 		}
@@ -60,9 +62,14 @@ func verifyConnection(rrs []*dns.TLSA, nameCheck bool) func(cs tls.ConnectionSta
 				continue
 			}
 			if err := t.Verify(cs.PeerCertificates[0]); err == nil {
+				if err := prove.VerifyCertificateExtensions(roots, *cert); err != nil {
+					log.Print(err)
+					return err
+				}
 				return nil
 			}
 		}
+
 		return &tlsError{err: "tls: dane authentication failed"}
 	}
 }
