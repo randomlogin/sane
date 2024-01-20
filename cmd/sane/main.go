@@ -244,7 +244,7 @@ func main() {
 		}
 	case nil:
 		sig0 = true
-		*ad = true
+		// *ad = true
 		*raddr = hostport
 	default:
 		log.Fatal(err)

@@ -68,7 +68,7 @@ Using local Handshake hnsd resolver would result in an error, as it will try to 
 
 ## Example website
 
-https://collate/ has a certificate complying to the HIP17.
+[collate/](https://collate/) has a certificate complying to the HIP17.
 
 ## Known problems
 
