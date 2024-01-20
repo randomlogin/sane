@@ -10,10 +10,6 @@ Server part can be found here: https://github.com/htools-org/stateless-dane.
 Similar to letsdane, it setups a proxy server which listens for incoming connections, resolves the hostname, checks if the provided certificate
 is correct and then outputs a self-signed certificate. Therefore the browser must have added a new certificate authority.
 
-Internally it uses hnsd to sync tree roots. The initial syncronization might take several minutes. Afterwards, using
-checkpoint, hnsd has to syncrhonize last ~2k roots which usually takes 5 seconds.
-
-hnsd default port is `5350`
 
 ## Install
 
@@ -21,6 +17,15 @@ In order to use SANE it's needed to have installed [hnsd fork](https://github.co
 provide path to the executable either via flag or via environment variable `export HNSD_PATH="~/hnsd/hnsd"`.
 
 Default directory containing CA files and saved tree roots is `~/.sane/`.
+
+# hnsd 
+Internally it uses hnsd to sync tree roots. The initial syncronization might take several minutes. Afterwards, using
+checkpoint, hnsd has to syncrhonize last ~2k roots which usually takes 5 seconds.
+
+hnsd default port is `5350`
+
+Internally it uses golang bindings of [liburkel C library](https://github.com/chjj/liburkel). Later it might be switched to the native go implementation
+(https://github.com/nodech/go-hsd-utils/).
 
 ## DNSSEC
 
