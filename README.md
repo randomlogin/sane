@@ -24,7 +24,7 @@ Default directory containing CA files and saved tree roots is `~/.sane/`.
 
 ## DNSSEC
 
-DNSSEC verification is done in the following ways:
+DNSSEC verification is done in the following way:
 
 1. Records from the extension are read, abort if there are any records except: TLSA, RRSIG, DNSKEY, DS.
 2. The records are linearly sorted by 'subdomain' relation. Abort if cannot be done.
