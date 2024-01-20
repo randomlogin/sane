@@ -43,6 +43,7 @@ You can build the latest version from source for now. binaries in releases are n
 Go 1.21+ is required. 
 
 ```
+export LIBRARY_PATH=/path/to/sane/prove/
 git clone https://github.com/randomlogin/sane.git && cd sane/cmd/sane
 go build 
 ```
