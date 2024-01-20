@@ -11,7 +11,6 @@ import (
 	"log"
 	"log/slog"
 	"net"
-	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -232,27 +231,17 @@ func main() {
 	}
 
 	var resolver rs.Resolver
-	var sig0, secure bool
+	var sig0 bool
 
 	hostport, key, err := splitHostPortKey(*raddr)
 	switch err {
 	case errNoKey:
 		sig0 = false
-		u, err := url.Parse(*raddr)
-		if err == nil {
-			secure = u.Scheme == "https" || u.Scheme == "tls"
-		}
 	case nil:
 		sig0 = true
-		// *ad = true
 		*raddr = hostport
 	default:
 		log.Fatal(err)
-	}
-
-	if !sig0 && !secure && !isLoopback(*raddr) {
-		log.Printf("You must have a local dnssec capable resolver to use letsdane securely")
-		log.Printf("'%s' is not a loopback address (insecure)!", *raddr)
 	}
 
 	ad, err := rs.NewStub(*raddr)
