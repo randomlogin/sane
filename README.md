@@ -1,7 +1,7 @@
 # Stateless DANE
 Based on [letsdane](https://github.com/buffrr/letsdane/).
 
-This repository contains code for proof-of-concept client implementation of [stateless DANE](https://github.com/handshake-org/HIPs/blob/master/HIP-0017.md) clients.
+This repository contains code for proof-of-concept client implementation of [stateless DANE](https://github.com/handshake-org/HIPs/blob/master/HIP-0017.md).
 
 Server part can be found here: https://github.com/htools-org/stateless-dane. 
 
