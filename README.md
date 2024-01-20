@@ -75,3 +75,7 @@ https://collate/ has a certificate complying to the HIP17.
 1. Rejects websites without HIP17 certificates instead of passing their certificates.
 2. Time intervals and UPDATEs are not handled properly.
 3. Several TLSA records are not supported yet.
+
+## Debug
+
+Some additional information is output with `--verbose` flag.
