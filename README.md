@@ -55,7 +55,7 @@ One can provide path to the executable either via flag `-hnsd` or via environmen
 Default directory containing CA files and saved tree roots is `~/.sane/`.
 
 ### Requirements
-Go 1.21+ is required. 
+Go 1.21+ is required. \
 hnsd 2.99.1+ is required.
 
 ### Build from source
