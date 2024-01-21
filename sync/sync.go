@@ -14,7 +14,7 @@ type BlockInfo struct {
 // TODO check if there is more than a week between sync then fail lookup
 // have a flag to override this failing behaviour
 // reads local file and get Roots object from it
-func ReadStoredRoots(filepath string) (*[]BlockInfo, error) {
+func ReadStoredRoots(filepath string) ([]BlockInfo, error) {
 	fileContent, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, err
@@ -26,5 +26,5 @@ func ReadStoredRoots(filepath string) (*[]BlockInfo, error) {
 		return nil, err
 	}
 
-	return &roots, nil
+	return roots, nil
 }

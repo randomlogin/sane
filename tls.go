@@ -22,12 +22,12 @@ func (t *tlsError) Error() string {
 }
 
 // newTLSConfig creates a new tls configuration capable of validating DANE.
-func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, roots *[]sync.BlockInfo) *tls.Config {
+func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, roots []sync.BlockInfo) *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify: true, // lgtm[go/disabled-certificate-check]
 		VerifyConnection:   verifyConnection(rrs, nameCheck, roots),
-		ServerName: host,
-		MinVersion: tls.VersionTLS12,
+		ServerName:         host,
+		MinVersion:         tls.VersionTLS12,
 		// Supported TLS 1.2 cipher suites
 		// Crypto package does automatic cipher suite ordering
 		CipherSuites: []uint16{
@@ -45,7 +45,7 @@ func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, roots *[]sync.Bl
 }
 
 // verifyConnection returns a function that verifies the given tls connection state using the host and rrs
-func verifyConnection(rrs []*dns.TLSA, nameCheck bool, roots *[]sync.BlockInfo) func(cs tls.ConnectionState) error {
+func verifyConnection(rrs []*dns.TLSA, nameCheck bool, roots []sync.BlockInfo) func(cs tls.ConnectionState) error {
 	return func(cs tls.ConnectionState) error {
 		// the host can be ignored per RFC 7671. Not Before, Not After are ignored as well.
 		// https://tools.ietf.org/html/rfc7671

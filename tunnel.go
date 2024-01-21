@@ -22,7 +22,7 @@ import (
 
 var (
 	// Version the current version
-	Version = "(untracked dev)"
+	Version = "0.0.2"
 )
 
 const (

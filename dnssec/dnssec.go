@@ -15,6 +15,8 @@ const rootKey = ". 10 IN DNSKEY 257 3 13 T9cURJ2M/Mz9q6UsZNY+Ospyvj+Uv+tgrrWkLtP
 
 //TODO split code into smaller functions
 //TODO check function arguments, set them to pointers where possible
+//TODO verify the dependencies, remove the unused ones
+//TODO add several TLSA records support (so rrsig would be a valid one)
 
 func parseRootKey() *dns.DNSKEY {
 	rr, err := dns.NewRR(rootKey)
@@ -28,7 +30,7 @@ func parseRootKey() *dns.DNSKEY {
 }
 
 // getRecordsFromCertificate returns records from certificate's dnssec extensions, the output is sorted by domain name, ascending
-//for example: "_443._tcp.domain.", "domain.", ".", it does not impose any assumptions on records or certificate
+// for example: "_443._tcp.domain.", "domain.", ".", it does not impose any assumptions on records or certificate
 func getRecordsFromCertificate(cert x509.Certificate) ([]dns.RR, error) {
 	var records []dns.RR
 	for _, ext := range cert.Extensions {
@@ -55,9 +57,7 @@ func getRecordsFromCertificate(cert x509.Certificate) ([]dns.RR, error) {
 	return nil, errors.New("could not find the right certificate extension")
 }
 
-//TODO 3. check if TLSA record key equals to the provided one in certificate
-
-// expects records to be sorted by domain name by their domain length descending (root zone is the last)
+// expects the records to be sorted by domain name length descending (root zone is the last)
 func VerifyDNSSECChain(cert x509.Certificate) error {
 	records, err := getRecordsFromCertificate(cert)
 	if err != nil {
@@ -92,15 +92,14 @@ func VerifyDNSSECChain(cert x509.Certificate) error {
 		}
 	}
 
-	//TODO add several TLSA records support (so rrsig would be a valid one)
-	//thus we identify the only TLSA record, in the for below it's checked if all other records in the slice are parents of TLSA
+	//thus we identify the only TLSA record, then it's checked if all other records in the slice are the parents of the TLSA
 	if len(tlsas) != 1 {
 		return errors.New("no TLSA record is found or found too many.")
 	}
 	tlsa := tlsas[0]
 
-	//iterating through all records to return a slice of slices—each they represent levels, it means
-	//there as distinct level for each label in the domain, one level for the root zone, one for the top level domain and so on.
+	//iterating through all records to return a slice of slices, they represent levels, it means
+	//there is distinct level for each label in the domain, one level for the root zone, one for the top level domain and so on
 	slices.Reverse(records)
 	var output []([]dns.RR)
 	var j int //last level to which i've added elements
@@ -130,7 +129,7 @@ func VerifyDNSSECChain(cert x509.Certificate) error {
 	}
 
 	//taking root trust anchor from the topmost level
-	rootDNSKEY, err := findRootDNSKEY(&output[0])
+	rootDNSKEY, err := findRootDNSKEY(output[0])
 	if err != nil {
 		return err
 	}
@@ -148,7 +147,7 @@ func VerifyDNSSECChain(cert x509.Certificate) error {
 		rootRRSIG, ok = record.(*dns.RRSIG)
 		if ok {
 			if rootRRSIG.TypeCovered != dns.TypeDNSKEY {
-				return fmt.Errorf("found root RRSIG corresponding not of DNSKEY, but the record %s", rootRRSIG)
+				return fmt.Errorf("found root RRSIG corresponding not to DNSKEY, but to the record %s", rootRRSIG)
 			}
 		}
 	}
@@ -175,7 +174,7 @@ func VerifyDNSSECChain(cert x509.Certificate) error {
 	//so now we can go to the main loop of taking DS, then dnskey and then go further
 	parents := rootZoneKeys
 	for _, level := range output[1:] {
-		parents, err = verifyLevel(level, &parents)
+		parents, err = verifyLevel(level, parents)
 		if err != nil {
 			return err
 		}
@@ -184,7 +183,7 @@ func VerifyDNSSECChain(cert x509.Certificate) error {
 	return nil
 }
 
-func verifyLevel(level []dns.RR, parentKeys *[]*dns.DNSKEY) ([]*dns.DNSKEY, error) {
+func verifyLevel(level []dns.RR, parentKeys []*dns.DNSKEY) ([]*dns.DNSKEY, error) {
 	var tlsas []*dns.TLSA
 	var dss []*dns.DS
 	var rrsigs []*dns.RRSIG
@@ -220,7 +219,7 @@ func verifyLevel(level []dns.RR, parentKeys *[]*dns.DNSKEY) ([]*dns.DNSKEY, erro
 		for _, rrsig_tlsa := range rrsigs {
 			if rrsig_tlsa.TypeCovered == dns.TypeTLSA {
 				tlsa_rr := []dns.RR{tlsas[0]}
-				err := verifyRRSIGWithDNSKEYs(parentKeys, rrsig_tlsa, &tlsa_rr)
+				err := verifyRRSIGWithDNSKEYs(parentKeys, rrsig_tlsa, tlsa_rr)
 				if err != nil {
 					return nil, err
 				}
@@ -238,7 +237,7 @@ func verifyLevel(level []dns.RR, parentKeys *[]*dns.DNSKEY) ([]*dns.DNSKEY, erro
 		}
 		for _, rrsig_ds := range rrsigs {
 			if rrsig_ds.TypeCovered == dns.TypeDS {
-				err := verifyRRSIGWithDNSKEYs(parentKeys, rrsig_ds, &rrs)
+				err := verifyRRSIGWithDNSKEYs(parentKeys, rrsig_ds, rrs)
 				if err != nil {
 					return nil, err
 				}
@@ -264,7 +263,7 @@ func verifyLevel(level []dns.RR, parentKeys *[]*dns.DNSKEY) ([]*dns.DNSKEY, erro
 		}
 		for _, rrsigDNSKEY := range rrsigs {
 			if rrsigDNSKEY.TypeCovered == dns.TypeDNSKEY {
-				err := verifyRRSIGWithDNSKEYs(&dnskeys, rrsigDNSKEY, &rrs)
+				err := verifyRRSIGWithDNSKEYs(dnskeys, rrsigDNSKEY, rrs)
 				if err != nil {
 					return nil, err
 				}
@@ -285,16 +284,16 @@ func isStrictParentDomain(parent, child *dns.RR) bool {
 	return dns.IsSubDomain(parentLabel, childLabel)
 }
 
-//debug
+// debug
 func myprintslice(qq []dns.RR) {
 	for _, x := range qq {
 		fmt.Print(x.Header().Name, " ")
 	}
 }
 
-//not used right now
-func findRootRRSIG(rrsigs *[]*dns.RRSIG, rootKey *dns.DNSKEY) (*dns.RRSIG, error) {
-	for _, rrsig := range *rrsigs {
+// Deprecated
+func findRootRRSIG(rrsigs []*dns.RRSIG, rootKey *dns.DNSKEY) (*dns.RRSIG, error) {
+	for _, rrsig := range rrsigs {
 		if rrsig.Hdr.Name == rootKey.Hdr.Name {
 			return rrsig, nil
 		}
@@ -302,11 +301,10 @@ func findRootRRSIG(rrsigs *[]*dns.RRSIG, rootKey *dns.DNSKEY) (*dns.RRSIG, error
 	return nil, errors.New("could not find root RRSIG associated to DNSKEY")
 }
 
-
 // findRootDNSKEY verifies that root key (global constant) exists in the provided slice of dns.DNSKEY, returns it if successful
-func findRootDNSKEY(keys *[]dns.RR) (*dns.DNSKEY, error) {
+func findRootDNSKEY(keys []dns.RR) (*dns.DNSKEY, error) {
 	rootKey := parseRootKey()
-	for _, dnskey := range *keys {
+	for _, dnskey := range keys {
 		if dns.IsDuplicate(dnskey, rootKey) {
 			return rootKey, nil
 		}
@@ -315,13 +313,13 @@ func findRootDNSKEY(keys *[]dns.RR) (*dns.DNSKEY, error) {
 }
 
 // takes a slice of dnskeys and an RRSIG and tries to verify rrsig using that key
-func verifyRRSIGWithDNSKEYs(dnskeys *[]*dns.DNSKEY, rrsig *dns.RRSIG, rrs *[]dns.RR) error {
-	ok := dns.IsRRset(*rrs)
+func verifyRRSIGWithDNSKEYs(dnskeys []*dns.DNSKEY, rrsig *dns.RRSIG, rrs []dns.RR) error {
+	ok := dns.IsRRset(rrs)
 	if !ok {
 		return fmt.Errorf("provided records do not form correct RRset")
 	}
-	for _, DNSKey := range *dnskeys {
-		err := rrsig.Verify(DNSKey, *rrs)
+	for _, DNSKey := range dnskeys {
+		err := rrsig.Verify(DNSKey, rrs)
 		if err == nil {
 			return nil
 		}

@@ -205,6 +205,11 @@ func main() {
 
 	flag.Parse()
 	p := getConfPath()
+	if *version {
+		fmt.Printf("Version %s\n", sane.Version)
+		return
+	}
+
 	if *hnsdPath == "" {
 		log.Fatal("path to hnsd is not provided")
 	}
@@ -214,11 +219,6 @@ func main() {
 	}
 
 	sync.GetRoots(*hnsdPath, p, *hnsdCheckpointPath)
-
-	if *version {
-		fmt.Printf("Version %s\n", sane.Version)
-		return
-	}
 
 	if !*skipICANN {
 		nameConstraints = nil
