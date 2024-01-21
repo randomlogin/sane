@@ -8,4 +8,4 @@
 
 ## Reporting a Vulnerability
 
-Contact me at letsdane@buffrr.dev
+Contact me at randomlogin76@gmail.com
