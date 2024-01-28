@@ -62,7 +62,7 @@ func verifyConnection(rrs []*dns.TLSA, nameCheck bool, roots []sync.BlockInfo) f
 				continue
 			}
 			if err := t.Verify(cs.PeerCertificates[0]); err == nil {
-				if err := prove.VerifyCertificateExtensions(roots, *cert); err != nil {
+				if err := prove.VerifyCertificateExtensions(roots, *cert, t); err != nil {
 					log.Print(err)
 					return err
 				}

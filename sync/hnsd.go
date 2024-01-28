@@ -40,8 +40,32 @@ const (
 
 var (
 	rootsFileName = "roots.json"
-	neededVersion = "2.99.1 (main)\n"
 )
+
+func CheckHNSDVersion() error {
+	qname := "chain.hnsd"
+
+	msg := new(dns.Msg)
+	msg.SetQuestion(dns.Fqdn(qname), dns.StringToType[qtype])
+	msg.SetEdns0(4096, true)
+	msg.Question[0].Qclass = dns.StringToClass[qclass]
+
+	client := new(dns.Client)
+	response, _, err := client.Exchange(msg, dnsAddress)
+	if err != nil {
+		return err
+	}
+
+	if len(response.Answer) > 0 {
+		for _, x := range response.Answer {
+			n := x.Header().Name
+			if n == "name_root.tip.chain.hnsd." {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("name_root is not output by hnsd")
+}
 
 // checks if hnsd has synced all blocks in order to kill the subprocess
 // does it by invoking hesoid DNS request which
@@ -51,10 +75,7 @@ func checkIfSynced() (bool, error) {
 	msg.SetQuestion(dns.Fqdn(qname), dns.StringToType[qtype])
 	msg.SetEdns0(4096, true)
 
-	// Set the query class
-	if qclass != "" {
-		msg.Question[0].Qclass = dns.StringToClass[qclass]
-	}
+	msg.Question[0].Qclass = dns.StringToClass[qclass]
 
 	// Use the net package to send the DNS query with a timeout
 	client := new(dns.Client)
@@ -82,15 +103,7 @@ func checkIfSynced() (bool, error) {
 func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string) {
 
 	rootPath := path.Join(confPath, rootsFileName)
-	checkVersion := exec.Command(pathToExecutable, "--version")
-	out, err := checkVersion.Output()
-	if err != nil {
-		log.Fatalf("Error checking version: %v", err)
-	}
 
-	if string(out) != neededVersion {
-		log.Fatalf("Wrong hnsd version. Aborting.")
-	}
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(ctx, pathToExecutable, "-n", dnsAddress, "-p", "4", "-r", "127.0.0.1:12345", "-t", "-x", pathToCheckpoint)
@@ -105,6 +118,12 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 	scanner := bufio.NewScanner(stdoutPipe)
 	if err := cmd.Start(); err != nil {
 		log.Fatalf("Error starting command: %v", err)
+	}
+
+	time.Sleep(1 * time.Second) //time hnsd needs to start running
+	if err := CheckHNSDVersion(); err != nil {
+		cancel()
+		log.Fatalf("hnsd version is not compatible with SANE or cannot be run properly: %v", err)
 	}
 
 	slidingWindow := make([]BlockInfo, 0, BlocksToStore)
@@ -148,7 +167,6 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 	for {
 		select {
 		case <-signalChannel:
-			// log.Print("got signal ", int(sign.(syscall.Signal)))
 			return
 		default:
 			for scanner.Scan() {

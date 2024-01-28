@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 
 	"github.com/miekg/dns"
@@ -35,16 +34,17 @@ func verifyUrkelExt(extensionValue []byte, domain string, roots []sync.BlockInfo
 	certRoot := extensionValue[1 : 1+32] //Magic numbers, should be checked
 	certProof := extensionValue[33:]
 
+	// log.Print(hex.EncodeToString(certProof))
 	urkelProof, err := proof.NewFromBytes(certProof)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("urkel verification: %s", err)
 	}
 
 	treeRoot := proof.UrkelHash(certRoot)
 	urkelKey := proof.UrkelHash(key)
 	resultCode, _ := urkelProof.Verify(treeRoot, urkelKey)
 	if resultCode != proof.ProofOk {
-		return fmt.Errorf("urkel proof verification failed")
+		return fmt.Errorf("urkel proof verification failed for TLD %s", domain)
 	}
 
 	// check that root is one of the stored ones
@@ -59,29 +59,44 @@ func verifyUrkelExt(extensionValue []byte, domain string, roots []sync.BlockInfo
 }
 
 // extracts proof data from the certificate then verifies if the proof is correct
-func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate) error {
-	domain := cert.DNSNames[0]
-	labels := dns.SplitDomainName(domain)
-	tld := labels[len(labels)-1]
+func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate, tlsa *dns.TLSA) error {
 	extensions := cert.Extensions
 	if len(extensions) < 2 {
 		return fmt.Errorf("not found enough extensions in the certificate")
 	}
+	if len(cert.DNSNames) == 0 {
+		return fmt.Errorf("certificate has empty dns names")
+	}
 
-	var UrkelVerificationError, DNSSECVerificationError error = errors.New("urkel tree proof extension was not found"), errors.New("DNSSEC chain extension was not found")
-	for _, elem := range extensions {
+	for _, domain := range cert.DNSNames {
+		err := verifyDomain(domain, cert, roots, tlsa)
+		if err == nil {
+			slog.Debug("successfully verified certificate extensions for domain " + domain)
+			return nil
+		}
+		slog.Debug("got error %s verifying domain %s", err, domain)
+	}
+	return fmt.Errorf("failed to verify certificate extensions")
+}
+
+func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, tlsa *dns.TLSA) error {
+	labels := dns.SplitDomainName(domain)
+	tld := labels[len(labels)-1]
+
+	var UrkelVerificationError, DNSSECVerificationError error = errors.New("urkel tree proof extension not found"), errors.New("DNSSEC chain extension not found")
+	for _, elem := range cert.Extensions {
 		slog.Debug("found an extenson in certificate, its id is ", elem.Id.String())
 		if elem.Id.String() == urkelExt {
 			UrkelVerificationError = verifyUrkelExt(elem.Value, tld, roots)
 			if UrkelVerificationError != nil {
-				slog.Debug("UrkelVerificationError", UrkelVerificationError)
+				slog.Debug("UrkelVerificationError", UrkelVerificationError, domain)
 				return UrkelVerificationError
 			}
 		}
 		if elem.Id.String() == dnssecExt {
-			DNSSECVerificationError = dnssec.VerifyDNSSECChain(cert)
+			DNSSECVerificationError = dnssec.VerifyDNSSECChain(cert, domain, tlsa)
 			if DNSSECVerificationError != nil {
-				slog.Debug("DNSSECVerificationError", DNSSECVerificationError)
+				slog.Debug("DNSSECVerificationError", DNSSECVerificationError, domain)
 				return DNSSECVerificationError
 			}
 		}
@@ -93,6 +108,7 @@ func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate) 
 	} else {
 		return fmt.Errorf("could not verify SANE for domain %s: %s, %s", domain, UrkelVerificationError, DNSSECVerificationError)
 	}
+
 }
 
 // Deprecated: using native golang implementation of urkel trees to verify
