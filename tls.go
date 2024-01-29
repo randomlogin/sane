@@ -25,7 +25,7 @@ func (t *tlsError) Error() string {
 func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, roots []sync.BlockInfo) *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify: true, // lgtm[go/disabled-certificate-check]
-		VerifyConnection:   verifyConnection(rrs, nameCheck, roots),
+		VerifyConnection:   verifyConnection(rrs, nameCheck, host, roots),
 		ServerName:         host,
 		MinVersion:         tls.VersionTLS12,
 		// Supported TLS 1.2 cipher suites
@@ -45,7 +45,8 @@ func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, roots []sync.Blo
 }
 
 // verifyConnection returns a function that verifies the given tls connection state using the host and rrs
-func verifyConnection(rrs []*dns.TLSA, nameCheck bool, roots []sync.BlockInfo) func(cs tls.ConnectionState) error {
+func verifyConnection(rrs []*dns.TLSA, nameCheck bool, host string, roots []sync.BlockInfo) func(cs tls.ConnectionState) error {
+	log.Print("host is ", host)
 	return func(cs tls.ConnectionState) error {
 		// the host can be ignored per RFC 7671. Not Before, Not After are ignored as well.
 		// https://tools.ietf.org/html/rfc7671

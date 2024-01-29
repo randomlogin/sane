@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 
 	"github.com/miekg/dns"
@@ -84,6 +85,55 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 	tld := labels[len(labels)-1]
 
 	var UrkelVerificationError, DNSSECVerificationError error = errors.New("urkel tree proof extension not found"), errors.New("DNSSEC chain extension not found")
+	//if does not contain dnssecExt:
+	var foundUrkel, foundDnssec bool
+	for _, elem := range cert.Extensions {
+		if elem.Id.String() == urkelExt {
+			foundUrkel = true
+		}
+		if elem.Id.String() == dnssecExt {
+			foundDnssec = true
+		}
+	}
+
+	// if !foundUrkel {
+	log.Print("yo ", tld)
+	urkel, err := fetchUrkel(domain)
+	if err != nil {
+		log.Print(err)
+		return err
+	}
+	log.Print("got urkel from external")
+	UrkelVerificationError = verifyUrkelExt(urkel, tld, roots)
+	if UrkelVerificationError != nil {
+		log.Print("UrkelVerificationError", UrkelVerificationError, domain)
+		return UrkelVerificationError
+	}
+
+	// }
+	log.Print(foundDnssec, foundUrkel)
+
+	if !foundDnssec {
+		log.Print("yo")
+		qwe, err := fetchDNSSEC(domain)
+		if err != nil {
+			log.Print(err)
+			return err
+		}
+		records, err := dnssec.ParseExt(qwe)
+		if err != nil {
+			log.Print(err)
+			return err
+		}
+		log.Print("got records from external")
+		DNSSECVerificationError = dnssec.VerifyDNSSECChain(records, domain, tlsa)
+		if DNSSECVerificationError != nil {
+			log.Print("DNSSECVerificationError", DNSSECVerificationError, domain)
+			return DNSSECVerificationError
+		}
+
+	}
+
 	for _, elem := range cert.Extensions {
 		slog.Debug("found an extenson in certificate, its id is ", elem.Id.String())
 		if elem.Id.String() == urkelExt {
@@ -94,7 +144,12 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 			}
 		}
 		if elem.Id.String() == dnssecExt {
-			DNSSECVerificationError = dnssec.VerifyDNSSECChain(cert, domain, tlsa)
+
+			records, err := dnssec.GetRecordsFromCertificate(cert)
+			if err != nil {
+				return err
+			}
+			DNSSECVerificationError = dnssec.VerifyDNSSECChain(records, domain, tlsa)
 			if DNSSECVerificationError != nil {
 				slog.Debug("DNSSECVerificationError", DNSSECVerificationError, domain)
 				return DNSSECVerificationError

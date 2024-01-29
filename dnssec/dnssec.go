@@ -2,8 +2,10 @@ package dnssec
 
 import (
 	"crypto/x509"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 	"slices"
 	"sort"
 
@@ -29,9 +31,33 @@ func parseRootKey() *dns.DNSKEY {
 	return dnsKey
 }
 
+func ParseExt(extval []byte) ([]dns.RR, error) {
+	var records []dns.RR
+	off := 4 //4 bytes of non-relevant data, namely port and value (of what?)
+	var rr dns.RR
+	var err error
+	// data := ext.Value
+
+	port := binary.BigEndian.Uint16(extval[:2])
+	log.Print(port)
+
+	for off < len(extval) {
+		rr, off, err = dns.UnpackRR(extval, off)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse record data from extension: %s ", err)
+		}
+		records = append(records, rr)
+	}
+	withoutDuplicates := dns.Dedup(records, nil)
+	if len(records) != len(withoutDuplicates) {
+		return nil, errors.New("extension data contains duplicate records")
+	}
+	return records, nil
+}
+
 // getRecordsFromCertificate returns records from certificate's dnssec extensions, the output is sorted by domain name, ascending
 // for example: "_443._tcp.domain.", "domain.", ".", it does not impose any assumptions on records or certificate
-func getRecordsFromCertificate(cert x509.Certificate) ([]dns.RR, error) {
+func GetRecordsFromCertificate(cert x509.Certificate) ([]dns.RR, error) {
 	var records []dns.RR
 	for _, ext := range cert.Extensions {
 		if ext.Id.String() == dnssecExt {
@@ -39,6 +65,9 @@ func getRecordsFromCertificate(cert x509.Certificate) ([]dns.RR, error) {
 			var rr dns.RR
 			var err error
 			data := ext.Value
+
+			port := binary.BigEndian.Uint16(data[:2])
+			log.Print(port)
 
 			for off < len(data) {
 				rr, off, err = dns.UnpackRR(data, off)
@@ -57,12 +86,9 @@ func getRecordsFromCertificate(cert x509.Certificate) ([]dns.RR, error) {
 	return nil, errors.New("could not find the right certificate extension")
 }
 
+// TODO distinguish KSK and ZSK
 // expects the records to be sorted by domain name length descending (root zone is the last)
-func VerifyDNSSECChain(cert x509.Certificate, domain string, dns_tlsa *dns.TLSA) error {
-	records, err := getRecordsFromCertificate(cert)
-	if err != nil {
-		return err
-	}
+func VerifyDNSSECChain(records []dns.RR, domain string, dns_tlsa *dns.TLSA) error {
 
 	var tlsas []*dns.TLSA
 	var dss []*dns.DS
