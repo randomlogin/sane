@@ -8,6 +8,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+<<<<<<< Updated upstream
+=======
+	"log/slog"
+>>>>>>> Stashed changes
 
 	"github.com/randomlogin/sane/sync"
 	"golang.org/x/crypto/sha3"
@@ -67,6 +71,7 @@ func verifyDNSSEC(val []byte) bool {
 	return true
 }
 
+<<<<<<< Updated upstream
 // extracts proof data from the certificate then verifies if the proof is correct
 func MyVerifyCertificate(rootsPath string) func(cs tls.ConnectionState) error {
 	return func(cs tls.ConnectionState) error {
@@ -86,6 +91,81 @@ func MyVerifyCertificate(rootsPath string) func(cs tls.ConnectionState) error {
 			}
 			if elem.Id.String() == dnssecExt {
 				verifiedDNSSEC = verifyDNSSEC(elem.Value)
+=======
+func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, tlsa *dns.TLSA) error {
+	labels := dns.SplitDomainName(domain)
+	tld := labels[len(labels)-1]
+
+	var UrkelVerificationError, DNSSECVerificationError error = errors.New("urkel tree proof extension not found"), errors.New("DNSSEC chain extension not found")
+	//if does not contain dnssecExt:
+	var foundUrkel, foundDnssec bool
+	for _, elem := range cert.Extensions {
+		if elem.Id.String() == urkelExt {
+			foundUrkel = true
+		}
+		if elem.Id.String() == dnssecExt {
+			foundDnssec = true
+		}
+	}
+
+	// if !foundUrkel {
+	log.Print("yo ", tld)
+	urkel, err := fetchUrkel(domain)
+	if err != nil {
+		log.Print(err)
+		return err
+	}
+	log.Print("got urkel from external")
+	UrkelVerificationError = verifyUrkelExt(urkel, tld, roots)
+	if UrkelVerificationError != nil {
+		log.Print("UrkelVerificationError", UrkelVerificationError, domain)
+		return UrkelVerificationError
+	}
+
+	// }
+	log.Print(foundDnssec, foundUrkel)
+
+	if !foundDnssec {
+		log.Print("yo")
+		qwe, err := fetchDNSSEC(domain)
+		if err != nil {
+			log.Print(err)
+			return err
+		}
+		records, err := dnssec.ParseExt(qwe)
+		if err != nil {
+			log.Print(err)
+			return err
+		}
+		log.Print("got records from external")
+		DNSSECVerificationError = dnssec.VerifyDNSSECChain(records, domain, tlsa)
+		if DNSSECVerificationError != nil {
+			log.Print("DNSSECVerificationError", DNSSECVerificationError, domain)
+			return DNSSECVerificationError
+		}
+
+	}
+
+	for _, elem := range cert.Extensions {
+		slog.Debug("found an extenson in certificate, its id is ", elem.Id.String())
+		if elem.Id.String() == urkelExt {
+			UrkelVerificationError = verifyUrkelExt(elem.Value, tld, roots)
+			if UrkelVerificationError != nil {
+				slog.Debug("UrkelVerificationError", UrkelVerificationError, domain)
+				return UrkelVerificationError
+			}
+		}
+		if elem.Id.String() == dnssecExt {
+
+			records, err := dnssec.GetRecordsFromCertificate(cert)
+			if err != nil {
+				return err
+			}
+			DNSSECVerificationError = dnssec.VerifyDNSSECChain(records, domain, tlsa)
+			if DNSSECVerificationError != nil {
+				slog.Debug("DNSSECVerificationError", DNSSECVerificationError, domain)
+				return DNSSECVerificationError
+>>>>>>> Stashed changes
 			}
 		}
 		if verifiedProof && verifiedDNSSEC {
