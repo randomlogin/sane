@@ -1,10 +1,8 @@
 package dnssec
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
 	"slices"
 	"sort"
 
@@ -35,10 +33,9 @@ func ParseExt(extval []byte) ([]dns.RR, error) {
 	off := 4 //4 bytes of non-relevant data, namely port and value (of what?)
 	var rr dns.RR
 	var err error
-	// data := ext.Value
 
-	port := binary.BigEndian.Uint16(extval[:2])
-	log.Print(port)
+	// port := binary.BigEndian.Uint16(extval[:2])
+	// log.Print(port)
 
 	for off < len(extval) {
 		rr, off, err = dns.UnpackRR(extval, off)

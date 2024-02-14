@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 
 	"github.com/miekg/dns"
@@ -67,7 +66,6 @@ func verifyUrkelExt(extensionValue []byte, domain string, roots []sync.BlockInfo
 	}
 	extensionValue = extensionValue[1:]
 	for ; i < numberOfProofs; i++ {
-		log.Print("i is ", i)
 		certRoot := extensionValue[:32] //Magic numbers, should be checked
 		hexstr := hex.EncodeToString(certRoot)
 
@@ -90,7 +88,7 @@ func verifyUrkelExt(extensionValue []byte, domain string, roots []sync.BlockInfo
 			}
 		}
 		extensionValue = extensionValue[32+*length:]
-		slog.Debug("have not found tree root ", hexstr, " from the certificate in the stored roots")
+		slog.Debug("could not find tree root ", hexstr, " from the certificate in the stored roots")
 	}
 	return fmt.Errorf("could not find tree root in the stored ones")
 }
@@ -143,10 +141,9 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 		}
 		urkelExtension, err = fetchUrkel(domain, externalService)
 		if err != nil {
-			log.Print(err)
+			// log.Print(err)
 			return err
 		}
-		log.Print("got urkel from external")
 	}
 
 	if !foundDnssec {
@@ -155,25 +152,24 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 		}
 		dnssecExtension, err = fetchDNSSEC(domain, externalService)
 		if err != nil {
-			log.Print(err)
+			// log.Print(err)
 			return err
 		}
-		log.Print("got records from external")
 	}
 
 	UrkelVerificationError = verifyUrkelExt(urkelExtension, tld, roots)
 	if UrkelVerificationError != nil {
-		log.Print("UrkelVerificationError", UrkelVerificationError, domain)
+		// log.Print("UrkelVerificationError", UrkelVerificationError, domain)
 		return UrkelVerificationError
 	}
 	records, err := dnssec.ParseExt(dnssecExtension)
 	if err != nil {
-		log.Print(err)
+		// log.Print(err)
 		return err
 	}
 	DNSSECVerificationError = dnssec.VerifyDNSSECChain(records, domain, tlsa)
 	if DNSSECVerificationError != nil {
-		log.Print("DNSSECVerificationError", DNSSECVerificationError, domain)
+		// log.Print("DNSSECVerificationError", DNSSECVerificationError, domain)
 		return DNSSECVerificationError
 	}
 

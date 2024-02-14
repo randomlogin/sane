@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"time"
 
@@ -46,7 +45,6 @@ func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, roots []sync.Blo
 
 // verifyConnection returns a function that verifies the given tls connection state using the host and rrs
 func verifyConnection(rrs []*dns.TLSA, nameCheck bool, host string, roots []sync.BlockInfo, externalService string) func(cs tls.ConnectionState) error {
-	log.Print("host is ", host)
 	return func(cs tls.ConnectionState) error {
 		// the host can be ignored per RFC 7671. Not Before, Not After are ignored as well.
 		// https://tools.ietf.org/html/rfc7671
@@ -64,7 +62,7 @@ func verifyConnection(rrs []*dns.TLSA, nameCheck bool, host string, roots []sync
 			}
 			if err := t.Verify(cs.PeerCertificates[0]); err == nil {
 				if err := prove.VerifyCertificateExtensions(roots, *cert, t, externalService); err != nil {
-					log.Print(err)
+					// log.Print(err)
 					return err
 				}
 				return nil
