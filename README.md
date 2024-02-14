@@ -38,6 +38,13 @@ To start SANE using handshake DNS Over HTTPS resolver:
 export HNSD_PATH="~/hnsd/hnsd"
 ./sane -r https://hnsdoh.com
 ```
+
+An additional parameter can be added: the external server which exctracts both DNSSEC and urkel proof for the domain
+which allows to browse websites without SANE-compliant certificates (of course this external service must be trusted).
+
+```
+./sane -r https://hnsdoh.com -external-service https://sdaneproofs.htools.work/proofs/
+```
 ### Browser settings
 - Add SANE proxy to your web browser `127.0.0.1:8080` ([Firefox example](https://user-images.githubusercontent.com/41967894/117558156-8f5b2a00-b02f-11eb-98ba-91ce8a9bdd4a.png))
 - Import the certificate file into your browser certificate store ([Firefox example](https://user-images.githubusercontent.com/41967894/117558164-a7cb4480-b02f-11eb-93ed-678f81f25f2e.png)).
