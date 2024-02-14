@@ -30,25 +30,27 @@ const (
 )
 
 type Config struct {
-	Certificate    *x509.Certificate
-	PrivateKey     interface{}
-	Validity       time.Duration
-	Resolver       resolver.Resolver
-	Constraints    map[string]struct{}
-	SkipNameChecks bool
-	Verbose        bool
-	RootsPath      string
+	Certificate     *x509.Certificate
+	PrivateKey      interface{}
+	Validity        time.Duration
+	Resolver        resolver.Resolver
+	Constraints     map[string]struct{}
+	SkipNameChecks  bool
+	Verbose         bool
+	RootsPath       string
+	ExternalService string
 
 	// For handling relative urls/non-proxy requests
 	ContentHandler http.Handler
 }
 
 type tunneler struct {
-	mitm        *mitmConfig
-	dialer      *dialer
-	RootsPath   string
-	nameChecks  bool
-	constraints map[string]struct{}
+	mitm            *mitmConfig
+	dialer          *dialer
+	RootsPath       string
+	ExternalService string
+	nameChecks      bool
+	constraints     map[string]struct{}
 	logger
 }
 
@@ -112,7 +114,7 @@ func (h *tunneler) Tunnel(ctx context.Context, clientConn *proxy.Conn, network, 
 	}
 
 	alpn := false
-	daneConfig := newTLSConfig(tlsaDomain, tlsa, h.nameChecks, roots)
+	daneConfig := newTLSConfig(tlsaDomain, tlsa, h.nameChecks, roots, h.ExternalService)
 	if len(hello.SupportedProtos) > 0 {
 		daneConfig.NextProtos = hello.SupportedProtos
 		alpn = true
@@ -170,8 +172,9 @@ func (c *Config) NewHandler() (*proxy.Handler, error) {
 			prefix:  "tunnel: %v CONNECT %s ",
 			verbose: c.Verbose,
 		},
-		constraints: c.Constraints,
-		RootsPath:   c.RootsPath,
+		constraints:     c.Constraints,
+		RootsPath:       c.RootsPath,
+		ExternalService: c.ExternalService,
 	}
 
 	httpProxy := &httputil.ReverseProxy{

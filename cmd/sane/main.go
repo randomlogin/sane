@@ -42,6 +42,8 @@ var (
 	version            = flag.Bool("version", false, "Show version")
 	hnsdPath           = flag.String("hnsd", os.Getenv("HNSD_PATH"), "path to hnsd executable, also may be set as environment variable HNSD_PATH")
 	hnsdCheckpointPath = flag.String("checkpoint", "", "path to hnsd checkpoint location, default ~/.hnsd")
+	resyncInterval     = flag.Duration("resync-interval", 24*time.Hour, "interval for roots resyncronization")
+	externalService    = flag.String("external-service", "", "uri to an external service providing SANE data")
 )
 
 func getConfPath() string {
@@ -219,6 +221,12 @@ func main() {
 	}
 
 	sync.GetRoots(*hnsdPath, p, *hnsdCheckpointPath)
+	go func() {
+		for {
+			time.Sleep(*resyncInterval)
+			sync.GetRoots(*hnsdPath, p, *hnsdCheckpointPath)
+		}
+	}()
 
 	if !*skipICANN {
 		nameConstraints = nil
@@ -256,14 +264,15 @@ func main() {
 	resolver = ad
 
 	c := &sane.Config{
-		Certificate:    ca,
-		PrivateKey:     priv,
-		Validity:       *validity,
-		Resolver:       resolver,
-		Constraints:    nameConstraints,
-		SkipNameChecks: *skipNameChecks,
-		Verbose:        *verbose,
-		RootsPath:      path.Join(p, "roots.json"),
+		Certificate:     ca,
+		PrivateKey:      priv,
+		Validity:        *validity,
+		Resolver:        resolver,
+		Constraints:     nameConstraints,
+		SkipNameChecks:  *skipNameChecks,
+		Verbose:         *verbose,
+		RootsPath:       path.Join(p, "roots.json"),
+		ExternalService: *externalService,
 	}
 	if *verbose {
 		logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{

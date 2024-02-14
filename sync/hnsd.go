@@ -100,6 +100,13 @@ func checkIfSynced() (bool, error) {
 	return false, nil
 }
 
+func PeriodicallySync(interval time.Duration, pathToExecutable, confPath, pathToCheckpoint string) {
+	for {
+		GetRoots(pathToExecutable, confPath, pathToCheckpoint)
+		time.Sleep(interval)
+	}
+}
+
 func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string) {
 
 	rootPath := path.Join(confPath, rootsFileName)

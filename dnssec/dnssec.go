@@ -1,7 +1,6 @@
 package dnssec
 
 import (
-	"crypto/x509"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -57,35 +56,16 @@ func ParseExt(extval []byte) ([]dns.RR, error) {
 
 // getRecordsFromCertificate returns records from certificate's dnssec extensions, the output is sorted by domain name, ascending
 // for example: "_443._tcp.domain.", "domain.", ".", it does not impose any assumptions on records or certificate
-func GetRecordsFromCertificate(cert x509.Certificate) ([]dns.RR, error) {
-	var records []dns.RR
-	for _, ext := range cert.Extensions {
-		if ext.Id.String() == dnssecExt {
-			off := 4 //4 bytes of non-relevant data, namely port and value (of what?)
-			var rr dns.RR
-			var err error
-			data := ext.Value
+// func GetRecordsFromCertificate(cert x509.Certificate) ([]dns.RR, error) {
+// 	for _, ext := range cert.Extensions {
+// 		if ext.Id.String() == dnssecExt {
+// 			return ParseExt(ext.Value)
+// 		}
+// 	}
+// 	return nil, errors.New("could not find the right certificate extension")
+// }
 
-			port := binary.BigEndian.Uint16(data[:2])
-			log.Print(port)
-
-			for off < len(data) {
-				rr, off, err = dns.UnpackRR(data, off)
-				if err != nil {
-					return nil, fmt.Errorf("cannot parse record data from extension: %s ", err)
-				}
-				records = append(records, rr)
-			}
-			withoutDuplicates := dns.Dedup(records, nil)
-			if len(records) != len(withoutDuplicates) {
-				return nil, errors.New("extension data contains duplicate records")
-			}
-			return records, nil
-		}
-	}
-	return nil, errors.New("could not find the right certificate extension")
-}
-
+// ZSK and KSK distinction is ephemeral: https://datatracker.ietf.org/doc/html/rfc6781#section-3.1
 // TODO distinguish KSK and ZSK
 // expects the records to be sorted by domain name length descending (root zone is the last)
 func VerifyDNSSECChain(records []dns.RR, domain string, dns_tlsa *dns.TLSA) error {
@@ -125,8 +105,6 @@ func VerifyDNSSECChain(records []dns.RR, domain string, dns_tlsa *dns.TLSA) erro
 
 	//iterating through all records to return a slice of slices, they represent levels, it means
 	//there is a distinct level for each label in the domain, one level for the root zone, one for the top level domain and so on
-	//we don't need to check that all other domains are parents of tlsa, as it follows from the correctness of dnssec
-	//chain verification
 	slices.Reverse(records)
 	var levels []([]dns.RR)
 	var j int //last level to which i've added elements
@@ -241,7 +219,7 @@ func verifyLevel(level []dns.RR, parentKeys []*dns.DNSKEY) ([]*dns.DNSKEY, error
 		}
 		for _, rrsig_tlsa := range rrsigs {
 			if rrsig_tlsa.TypeCovered == dns.TypeTLSA {
-				err := verifyRRSIGWithDNSKEYs(parentKeys, rrsig_tlsa, tlsas_rr)
+				_, err := verifyRRSIGWithDNSKEYs(parentKeys, rrsig_tlsa, tlsas_rr)
 				if err != nil {
 					return nil, err
 				}
@@ -252,7 +230,7 @@ func verifyLevel(level []dns.RR, parentKeys []*dns.DNSKEY) ([]*dns.DNSKEY, error
 	}
 
 	//DS handling
-	//if i have DS it should have rrsig which is signed by parent key
+	//if i have DS it should have rrsig which is signed by key
 	if len(dss) != 0 {
 		var rrs []dns.RR
 		for _, ds := range dss {
@@ -260,7 +238,7 @@ func verifyLevel(level []dns.RR, parentKeys []*dns.DNSKEY) ([]*dns.DNSKEY, error
 		}
 		for _, rrsig_ds := range rrsigs {
 			if rrsig_ds.TypeCovered == dns.TypeDS {
-				err := verifyRRSIGWithDNSKEYs(parentKeys, rrsig_ds, rrs)
+				_, err := verifyRRSIGWithDNSKEYs(parentKeys, rrsig_ds, rrs)
 				if err != nil {
 					return nil, err
 				}
@@ -269,28 +247,32 @@ func verifyLevel(level []dns.RR, parentKeys []*dns.DNSKEY) ([]*dns.DNSKEY, error
 	}
 
 	//DNSKEY handling
-	//if there is a DNSKEY it should have RRSIG signed by this ZSK, it also should have corresponding DS record
+	//if there is a DNSKEY it should have RRSIG signed by this a key which called KSK, it should have DS
 	if len(dnskeys) != 0 {
+		//change dnskeys to RRset
 		var rrs []dns.RR
-		for _, dnskey := range dnskeys {
-			rrs = append(rrs, dnskey)
-			dnskeyToDSed := dnskey.ToDS(dns.SHA256)
-			var dnsHasDS bool
-			for _, ds := range dss {
-				dnsHasDS = dnsHasDS || dns.IsDuplicate(dnskeyToDSed, ds)
-			}
-			if !dnsHasDS {
-				return nil, errors.New("could not find correct DS record for all DNSKEY records")
-			}
-
+		for _, dskey := range dnskeys {
+			rrs = append(rrs, dskey)
 		}
+		//check that rrsig of dnskeys is signed by ksk
+		var ksk *dns.DNSKEY
+		var err error
 		for _, rrsigDNSKEY := range rrsigs {
 			if rrsigDNSKEY.TypeCovered == dns.TypeDNSKEY {
-				err := verifyRRSIGWithDNSKEYs(dnskeys, rrsigDNSKEY, rrs)
+				ksk, err = verifyRRSIGWithDNSKEYs(dnskeys, rrsigDNSKEY, rrs)
 				if err != nil {
 					return nil, err
 				}
 			}
+		}
+		//check that ksk has ds
+		dnskeyToDSed := ksk.ToDS(dns.SHA256)
+		var kskHasDS bool
+		for _, ds := range dss {
+			kskHasDS = kskHasDS || dns.IsDuplicate(dnskeyToDSed, ds)
+		}
+		if !kskHasDS {
+			return nil, errors.New("could not find DS for Key Signing Key")
 		}
 	}
 
@@ -326,17 +308,17 @@ func findRootDNSKEY(keys []dns.RR) (*dns.DNSKEY, error) {
 }
 
 // takes a slice of dnskeys and an RRSIG and tries to verify rrsig using that key
-func verifyRRSIGWithDNSKEYs(dnskeys []*dns.DNSKEY, rrsig *dns.RRSIG, rrs []dns.RR) error {
+func verifyRRSIGWithDNSKEYs(dnskeys []*dns.DNSKEY, rrsig *dns.RRSIG, rrs []dns.RR) (*dns.DNSKEY, error) {
 	ok := dns.IsRRset(rrs)
 	if !ok {
-		return fmt.Errorf("provided records do not form correct RRset")
+		return nil, fmt.Errorf("provided records do not form correct RRset")
 	}
 	for _, DNSKey := range dnskeys {
 		err := rrsig.Verify(DNSKey, rrs)
 		if err == nil {
-			return nil
+			return DNSKey, nil
 		}
 	}
-	return fmt.Errorf("could not verify RRSIG for the type %s using provided DNSKEYs", dns.TypeToString[rrsig.TypeCovered])
+	return nil, fmt.Errorf("could not verify RRSIG for the type %s using provided DNSKEYs", dns.TypeToString[rrsig.TypeCovered])
 
 }
