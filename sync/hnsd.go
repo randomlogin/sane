@@ -88,7 +88,6 @@ func checkIfSynced() (bool, error) {
 	// Check the DNS response for synchronization status
 	if len(response.Answer) > 0 {
 		if txtRecord, ok := response.Answer[0].(*dns.TXT); ok {
-			// slog.Debug("in syncing", txtRecord.Txt)
 			if txtRecord.Txt[0] == "true" {
 				return true, nil
 			}

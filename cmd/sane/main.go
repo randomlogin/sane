@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"log/slog"
 	"net"
 	"os"
 	"path"
@@ -19,6 +18,7 @@ import (
 	"github.com/buffrr/hsig0"
 	"github.com/miekg/dns"
 	sane "github.com/randomlogin/sane"
+	"github.com/randomlogin/sane/debuglog"
 	rs "github.com/randomlogin/sane/resolver"
 	"github.com/randomlogin/sane/sync"
 )
@@ -274,15 +274,11 @@ func main() {
 		RootsPath:       path.Join(p, "roots.json"),
 		ExternalService: *externalService,
 	}
+	debuglog.Logger = debuglog.NewDebugLogger(false)
 	if *verbose {
-		logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-			Level:     slog.LevelDebug,
-			AddSource: true,
-		})
-		logger := slog.New(logHandler)
-		slog.SetDefault(logger)
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
+		debuglog.Logger = debuglog.NewDebugLogger(true)
 	}
-	// log.D
 
 	log.Printf("Listening on %s", *addr)
 	log.Fatal(c.Run(*addr))

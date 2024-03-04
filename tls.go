@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/randomlogin/sane/debuglog"
 	"github.com/randomlogin/sane/prove"
 	"github.com/randomlogin/sane/sync"
 )
@@ -57,12 +58,13 @@ func verifyConnection(rrs []*dns.TLSA, nameCheck bool, host string, roots []sync
 
 		// Verify the leaf certificate against the TLSA rrs
 		for _, t := range rrs {
+
 			if t.Usage != 3 {
 				continue
 			}
 			if err := t.Verify(cs.PeerCertificates[0]); err == nil {
 				if err := prove.VerifyCertificateExtensions(roots, *cert, t, externalService); err != nil {
-					// log.Print(err)
+					debuglog.Logger.Debug(err)
 					return err
 				}
 				return nil

@@ -1,17 +1,14 @@
 package prove
 
-// #cgo LDFLAGS: -lurkel
-// #include "urkel.h"
-import "C"
 import (
 	"bytes"
 	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/miekg/dns"
+	"github.com/randomlogin/sane/debuglog"
 	"github.com/randomlogin/sane/dnssec"
 	"github.com/randomlogin/sane/sync"
 	"golang.org/x/crypto/sha3"
@@ -70,35 +67,31 @@ func verifyUrkelExt(extensionValue []byte, domain string, roots []sync.BlockInfo
 		hexstr := hex.EncodeToString(certRoot)
 
 		if len(extensionValue) < 32 {
-			slog.Debug("urkel proof is empty")
+			debuglog.Logger.Debug("urkel proof is empty")
 			return fmt.Errorf("urkel data is corrupted")
 		}
 		certProof := extensionValue[32:]
 		length, err := checkProof(certProof, certRoot, key)
 		if err != nil {
 			//found invalid proof
-			slog.Debug("urkel verification failed: %s", err)
+			debuglog.Logger.Debug("urkel verification failed: %s", err)
 			return err
 		}
 		for _, block := range roots {
 			// found tree root among stored ones
 			if hexstr == block.TreeRoot {
-				slog.Debug("found tree root ", hexstr, " from the certificate in the stored roots")
+				debuglog.Logger.Debug("found tree root ", hexstr, " from the certificate in the stored roots")
 				return nil
 			}
 		}
 		extensionValue = extensionValue[32+*length:]
-		slog.Debug("could not find tree root ", hexstr, " from the certificate in the stored roots")
+		debuglog.Logger.Debug("could not find tree root ", hexstr, " from the certificate in the stored roots")
 	}
 	return fmt.Errorf("could not find tree root in the stored ones")
 }
 
 // extracts proof data from the certificate then verifies if the proof is correct
 func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate, tlsa *dns.TLSA, externalService string) error {
-	extensions := cert.Extensions
-	if len(extensions) < 2 {
-		return fmt.Errorf("not found enough extensions in the certificate")
-	}
 	if len(cert.DNSNames) == 0 {
 		return fmt.Errorf("certificate has empty dns names")
 	}
@@ -106,10 +99,10 @@ func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate, 
 	for _, domain := range cert.DNSNames {
 		err := verifyDomain(domain, cert, roots, tlsa, externalService)
 		if err == nil {
-			slog.Debug("successfully verified certificate extensions for domain " + domain)
+			debuglog.Logger.Debug("successfully verified certificate extensions for domain " + domain)
 			return nil
 		}
-		slog.Debug("got error %s verifying domain %s", err, domain)
+		debuglog.Logger.Debugf("got error: %s during verification domain %s", err, domain)
 	}
 	return fmt.Errorf("failed to verify certificate extensions")
 }
@@ -168,13 +161,14 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 		return err
 	}
 	DNSSECVerificationError = dnssec.VerifyDNSSECChain(records, domain, tlsa)
+
 	if DNSSECVerificationError != nil {
-		// log.Print("DNSSECVerificationError", DNSSECVerificationError, domain)
+		debuglog.Logger.Debug("DNSSECVerificationError", DNSSECVerificationError, domain)
 		return DNSSECVerificationError
 	}
 
 	if (UrkelVerificationError == nil) && (DNSSECVerificationError == nil) {
-		slog.Debug("DANE extensions from certificate are both valid")
+		debuglog.Logger.Debug("DANE extensions from certificate are both valid")
 		return nil
 	} else {
 		return fmt.Errorf("could not verify SANE for domain %s: %s, %s", domain, UrkelVerificationError, DNSSECVerificationError)
@@ -182,50 +176,50 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 }
 
 // Deprecated: using native golang implementation of urkel trees to verify
-func verifyUrkelExtC(extensionValue []byte, domain string, roots []sync.BlockInfo) error {
-	h := sha3.New256()
-	h.Write([]byte(domain))
-	key := h.Sum(nil)
-
-	certRoot := extensionValue[1 : 1+32] //Magic numbers, should be checked
-	certProof := extensionValue[33:]
-
-	proofResult := verifyUrkelProof(key, certProof, certRoot)
-	if !proofResult {
-		return fmt.Errorf("the proof in the certificate is not valid")
-	}
-
-	// check that root is one of the stored ones
-	hexstr := hex.EncodeToString(certRoot)
-	for _, block := range roots {
-		if hexstr == block.TreeRoot {
-			// log.Print("Found tree root ", block.TreeRoot, " from the certificate in the stored ones.")
-			return nil
-		}
-	}
-	return fmt.Errorf("urkel tree root %s from the certificate was not found among the stored ones", hexstr)
-}
-
+// func verifyUrkelExtC(extensionValue []byte, domain string, roots []sync.BlockInfo) error {
+// 	h := sha3.New256()
+// 	h.Write([]byte(domain))
+// 	key := h.Sum(nil)
+//
+// 	certRoot := extensionValue[1 : 1+32] //Magic numbers, should be checked
+// 	certProof := extensionValue[33:]
+//
+// 	proofResult := verifyUrkelProof(key, certProof, certRoot)
+// 	if !proofResult {
+// 		return fmt.Errorf("the proof in the certificate is not valid")
+// 	}
+//
+// 	// check that root is one of the stored ones
+// 	hexstr := hex.EncodeToString(certRoot)
+// 	for _, block := range roots {
+// 		if hexstr == block.TreeRoot {
+// 			// log.Print("Found tree root ", block.TreeRoot, " from the certificate in the stored ones.")
+// 			return nil
+// 		}
+// 	}
+// 	return fmt.Errorf("urkel tree root %s from the certificate was not found among the stored ones", hexstr)
+// }
+//
 // Deprecated: this version uses
 // verifies key in the urkel tree with a given proof against a given root
-func verifyUrkelProof(key, proof, root []byte) bool {
-	proofLen := C.size_t(len(proof))
-	var exists C.int
-	value := make([]byte, len(proof))
-	var valueLen C.size_t
-
-	intres := C.urkel_verify(
-		&exists,
-		(*C.uchar)(&value[0]),
-		&valueLen,
-		(*C.uchar)(&proof[0]),
-		proofLen,
-		(*C.uchar)(&key[0]),
-		(*C.uchar)(&root[0]))
-
-	if intres == 1 {
-		return true
-	} else {
-		return false
-	}
-}
+// func verifyUrkelProof(key, proof, root []byte) bool {
+// 	proofLen := C.size_t(len(proof))
+// 	var exists C.int
+// 	value := make([]byte, len(proof))
+// 	var valueLen C.size_t
+//
+// 	intres := C.urkel_verify(
+// 		&exists,
+// 		(*C.uchar)(&value[0]),
+// 		&valueLen,
+// 		(*C.uchar)(&proof[0]),
+// 		proofLen,
+// 		(*C.uchar)(&key[0]),
+// 		(*C.uchar)(&root[0]))
+//
+// 	if intres == 1 {
+// 		return true
+// 	} else {
+// 		return false
+// 	}
+// }
