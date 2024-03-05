@@ -25,16 +25,16 @@ func fetchDNSSEC(domain, server string) ([]byte, error) {
 	url := server + domain + "?dnssec"
 	response, err := http.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("Error making GET request: %s", err)
+		return nil, fmt.Errorf("error making GET request: %s", err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Error: Status code is not OK: %s", response.Status)
+		return nil, fmt.Errorf("status code is not OK: %s", response.Status)
 	}
 
 	var data DNSSECJson
 	if err := json.NewDecoder(response.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("Error decoding JSON: %s", err)
+		return nil, fmt.Errorf("error decoding JSON: %s", err)
 	}
 
 	val, err := hex.DecodeString(data.Dnssec)

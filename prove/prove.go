@@ -74,7 +74,7 @@ func verifyUrkelExt(extensionValue []byte, domain string, roots []sync.BlockInfo
 		length, err := checkProof(certProof, certRoot, key)
 		if err != nil {
 			//found invalid proof
-			debuglog.Logger.Debug("urkel verification failed: %s", err)
+			debuglog.Logger.Debugf("urkel verification failed: %s", err)
 			return err
 		}
 		for _, block := range roots {
@@ -99,7 +99,7 @@ func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate, 
 	for _, domain := range cert.DNSNames {
 		err := verifyDomain(domain, cert, roots, tlsa, externalService)
 		if err == nil {
-			debuglog.Logger.Debug("successfully verified certificate extensions for domain " + domain)
+			debuglog.Logger.Debug("successfully verified certificate extensions for the domain " + domain)
 			return nil
 		}
 		debuglog.Logger.Debugf("got error: %s during verification domain %s", err, domain)
@@ -134,7 +134,7 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 		}
 		urkelExtension, err = fetchUrkel(domain, externalService)
 		if err != nil {
-			// log.Print(err)
+			debuglog.Logger.Debugf("failed to fetch DNSSEC data from %s for the domain %s: %s", externalService, domain, err)
 			return err
 		}
 	}
@@ -145,25 +145,25 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 		}
 		dnssecExtension, err = fetchDNSSEC(domain, externalService)
 		if err != nil {
-			// log.Print(err)
+			debuglog.Logger.Debugf("failed to fetch DNSSEC data from %s for the domain %s: %s", externalService, domain, err)
 			return err
 		}
 	}
 
 	UrkelVerificationError = verifyUrkelExt(urkelExtension, tld, roots)
 	if UrkelVerificationError != nil {
-		// log.Print("UrkelVerificationError", UrkelVerificationError, domain)
+		debuglog.Logger.Debugf("failed to verify urkel proof: %s", UrkelVerificationError)
 		return UrkelVerificationError
 	}
 	records, err := dnssec.ParseExt(dnssecExtension)
 	if err != nil {
-		// log.Print(err)
+		debuglog.Logger.Debugf("failed to parse DNSSEC extension: %s", err)
 		return err
 	}
-	DNSSECVerificationError = dnssec.VerifyDNSSECChain(records, domain, tlsa)
 
+	DNSSECVerificationError = dnssec.VerifyDNSSECChain(records, domain, tlsa)
 	if DNSSECVerificationError != nil {
-		debuglog.Logger.Debug("DNSSECVerificationError", DNSSECVerificationError, domain)
+		debuglog.Logger.Debugf("failed to verify DNSSEC chain: %s", DNSSECVerificationError)
 		return DNSSECVerificationError
 	}
 
@@ -171,7 +171,7 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 		debuglog.Logger.Debug("DANE extensions from certificate are both valid")
 		return nil
 	} else {
-		return fmt.Errorf("could not verify SANE for domain %s: %s, %s", domain, UrkelVerificationError, DNSSECVerificationError)
+		return fmt.Errorf("could not verify SANE for the domain %s: %s, %s", domain, UrkelVerificationError, DNSSECVerificationError)
 	}
 }
 

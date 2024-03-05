@@ -10,7 +10,7 @@ type DebugLogger struct {
 	*log.Logger
 }
 
-var Logger *DebugLogger
+var Logger *DebugLogger = NewDebugLogger(false)
 
 func (l *DebugLogger) Set() {
 	l.Verbose = true
@@ -34,15 +34,3 @@ func (l *DebugLogger) Debugf(s string, v ...interface{}) {
 		l.Printf(s, v...)
 	}
 }
-
-// func (l *DebugLogger) Print(v ...interface{}) {
-// 	log.Print(v...)
-// }
-//
-// func (l *DebugLogger) Fatal(v ...interface{}) {
-// 	log.Fatal(v...)
-// }
-//
-// func (l *DebugLogger) Fatalf(a string, v ...interface{}) {
-// 	log.Fatalf(a, v...)
-// }

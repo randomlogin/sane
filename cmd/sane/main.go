@@ -212,6 +212,11 @@ func main() {
 		return
 	}
 
+	if *verbose {
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
+		debuglog.Logger.Verbose = true
+	}
+
 	if *hnsdPath == "" {
 		log.Fatal("path to hnsd is not provided")
 	}
@@ -274,12 +279,6 @@ func main() {
 		RootsPath:       path.Join(p, "roots.json"),
 		ExternalService: *externalService,
 	}
-	debuglog.Logger = debuglog.NewDebugLogger(false)
-	if *verbose {
-		log.SetFlags(log.LstdFlags | log.Lshortfile)
-		debuglog.Logger = debuglog.NewDebugLogger(true)
-	}
-
 	log.Printf("Listening on %s", *addr)
 	log.Fatal(c.Run(*addr))
 }
