@@ -28,14 +28,15 @@ func contains(s []BlockInfo, str string) bool {
 }
 
 const (
-	BlocksToStore = 40
-	dnsServer     = "127.0.0.1"
-	dnsPort       = "5350"
-	dnsAddress    = dnsServer + ":" + dnsPort
-	qtype         = "TXT"
-	qclass        = "HS"
-	qname         = "synced.chain.hnsd"
-	timeToNotify  = 2
+	BlocksToStore  = 40
+	dnsServer      = "127.0.0.1"
+	dnsPort        = "5350"
+	dnsAddress     = dnsServer + ":" + dnsPort
+	qtype          = "TXT"
+	qclass         = "HS"
+	qname          = "synced.chain.hnsd"
+	timeToNotify   = 2
+	secondsForHNSD = 5
 )
 
 var (
@@ -124,10 +125,16 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 		log.Fatalf("Error starting command: %v", err)
 	}
 
-	time.Sleep(1 * time.Second) //time hnsd needs to start running
-	if err := CheckHNSDVersion(); err != nil {
-		cancel()
-		log.Fatalf("hnsd version is not compatible with SANE or cannot be run properly: %v", err)
+	time.Sleep(100 * time.Millisecond) //wait 0.1 should suffice for the most of the computers
+	for i := 1; i <= secondsForHNSD; i++ {
+		if err := CheckHNSDVersion(); err == nil {
+			break
+		}
+		if i == secondsForHNSD {
+			cancel()
+			log.Fatalf("hnsd version is not compatible with SANE or cannot be run properly: %v", err)
+		}
+		time.Sleep(1000 * time.Millisecond) //time hnsd needs to start running
 	}
 
 	slidingWindow := make([]BlockInfo, 0, BlocksToStore)
