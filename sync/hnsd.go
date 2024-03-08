@@ -168,7 +168,7 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 				break
 			}
 		}
-		signalChannel <- syscall.SIGUSR2
+		signalChannel <- syscall.SIGINT
 		return
 	}()
 
