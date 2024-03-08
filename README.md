@@ -22,8 +22,8 @@ git clone https://github.com/randomlogin/sane.git && cd sane/cmd/sane
 go build 
 ```
 
-Next, in order to use SANE it's needed to have installed [hnsd](https://github.com/handshake-org/hnsd). 
-One can provide path to the executable either via flag `-hnsd` or via environment variable 
+Next, in order to use SANE it's needed to have [hnsd](https://github.com/handshake-org/hnsd) installed. 
+One can provide the path to the `hnsd` executable either via flag `-hnsd` or via environment variable 
 
 `export HNSD_PATH="~/hnsd/hnsd"`
 
@@ -39,7 +39,7 @@ export HNSD_PATH="~/hnsd/hnsd"
 ./sane -r https://hnsdoh.com
 ```
 
-An additional parameter can be added: the external server which exctracts both DNSSEC and urkel proof for the domain
+An additional parameter can be added: the external server which exctracts both DNSSEC and urkel proof for the domain,
 which allows to browse websites without SANE-compliant certificates (of course this external service must be trusted).
 
 ```
@@ -52,7 +52,7 @@ Additional arguments can be viewed by invoking help:
 ```
 
 ### Urkel tree
-SANE looks for an extension in the certificate which contains urkel tree proof, verifies it, checks if the root is not
+SANE looks for an extension in the certificate which contains an urkel tree proof, verifies it, checks if the root is not
 older than a week.\
 Native [golang implementation of urkel tree](https://github.com/nodech/go-hsd-utils/) is used.
 
