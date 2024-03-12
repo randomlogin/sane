@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -26,14 +27,14 @@ func main() {
 
 	h := fmt.Sprintf(`// source: %s
 
-var nameConstraints = map[string]struct{} {
+var NameConstraints = map[string]struct{} {
 `, source)
 
 	sc := bufio.NewScanner(resp.Body)
 	for sc.Scan() {
 		line := strings.ToLower(strings.TrimSpace(sc.Text()))
 		if line != "" && line[0] == '#' {
-			sb.WriteString("package main\n\n")
+			sb.WriteString("package tld\n\n")
 			sb.WriteString("// auto generated do not edit\n")
 			sb.WriteString("//" + line[1:] + "\n")
 			sb.WriteString(h)
@@ -47,7 +48,15 @@ var nameConstraints = map[string]struct{} {
 	}
 	sb.WriteString("}\n")
 
-	if err := os.WriteFile("tld.go", sb.Bytes(), 0600); err != nil {
+	path, _ := filepath.Abs("")
+	last := filepath.Base(path)
+	path = filepath.Dir(path)
+	prelast := filepath.Base(path)
+	if last != "sane" || prelast != "cmd" {
+		log.Fatal(fmt.Errorf("tld list must be generated in cmd/sane directory"))
+	}
+
+	if err := os.WriteFile("../../tld/tld.go", sb.Bytes(), 0600); err != nil {
 		log.Fatal(err)
 	}
 

@@ -21,6 +21,7 @@ import (
 	"github.com/randomlogin/sane/debuglog"
 	rs "github.com/randomlogin/sane/resolver"
 	"github.com/randomlogin/sane/sync"
+	"github.com/randomlogin/sane/tld"
 )
 
 const KSK2017 = `. IN DS 20326 8 2 E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D`
@@ -77,7 +78,7 @@ func getOrCreateCA() (string, string) {
 
 	if _, err := os.Stat(certPath); err != nil {
 		if _, err := os.Stat(keyPath); err != nil {
-			ca, priv, err := sane.NewAuthority("Stateless DANE", "Stateless DANE", 365*24*time.Hour, nameConstraints)
+			ca, priv, err := sane.NewAuthority("Stateless DANE", "Stateless DANE", 365*24*time.Hour, tld.NameConstraints)
 			if err != nil {
 				log.Fatalf("couldn't generate CA: %v", err)
 			}
@@ -234,7 +235,7 @@ func main() {
 	}()
 
 	if !*skipICANN {
-		nameConstraints = nil
+		tld.NameConstraints = nil
 	}
 
 	ca, priv := loadCA()
@@ -273,7 +274,7 @@ func main() {
 		PrivateKey:      priv,
 		Validity:        *validity,
 		Resolver:        resolver,
-		Constraints:     nameConstraints,
+		Constraints:     tld.NameConstraints,
 		SkipNameChecks:  *skipNameChecks,
 		Verbose:         *verbose,
 		RootsPath:       path.Join(p, "roots.json"),
