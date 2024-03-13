@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	Version = "0.0.7"
+	Version = "0.0.9"
 )
 
 const (
@@ -37,7 +37,7 @@ type Config struct {
 	SkipNameChecks  bool
 	Verbose         bool
 	RootsPath       string
-	ExternalService string
+	ExternalService []string
 
 	// For handling relative urls/non-proxy requests
 	ContentHandler http.Handler
@@ -47,7 +47,7 @@ type tunneler struct {
 	mitm            *mitmConfig
 	dialer          *dialer
 	RootsPath       string
-	ExternalService string
+	ExternalService []string
 	nameChecks      bool
 	constraints     map[string]struct{}
 	logger
@@ -230,7 +230,7 @@ func httpError(w http.ResponseWriter, error string, code int) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(code)
-	fmt.Fprintf(w, "<h1>%d %s</h1><p>%s</p><hr>letsdane/v%s",
+	fmt.Fprintf(w, "<h1>%d %s</h1><p>%s</p><hr>sane/v%s",
 		code, http.StatusText(code), html.EscapeString(error), Version)
 }
 

@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/randomlogin/sane/debuglog"
 )
 
 type UrkelJson struct {
@@ -16,14 +19,37 @@ type DNSSECJson struct {
 	Dnssec string `json:"dnssec"`
 }
 
-var defaultURL = "https://sdaneproofs.htools.work/proofs/"
+var timeout = 1 * time.Second
 
-func fetchDNSSEC(domain, server string) ([]byte, error) {
+func fetchDNSSEC(domain string, externalServices []string) ([]byte, error) {
+	for _, link := range externalServices {
+		if result, err := fetchOneDNSSEC(domain, link); err == nil {
+			return result, nil
+		}
+		debuglog.Logger.Debugf("couldn't fetch dnssec data for domain %s from %s", domain, link)
+	}
+	return nil, fmt.Errorf("could not fetch any external services")
+}
+
+func fetchUrkel(domain string, externalServices []string) ([]byte, error) {
+	for _, link := range externalServices {
+		if result, err := fetchOneUrkel(domain, link); err == nil {
+			return result, nil
+		}
+		debuglog.Logger.Debugf("couldn't fetch urkel data for domain %s from %s", domain, link)
+	}
+	return nil, fmt.Errorf("could not fetch any external services")
+}
+
+func fetchOneDNSSEC(domain, server string) ([]byte, error) {
 	if !strings.HasSuffix(server, "/") {
 		server += "/"
 	}
 	url := server + domain + "?dnssec"
-	response, err := http.Get(url)
+	client := http.Client{
+		Timeout: timeout,
+	}
+	response, err := client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("error making GET request: %s", err)
 	}
@@ -44,12 +70,16 @@ func fetchDNSSEC(domain, server string) ([]byte, error) {
 	return val, nil
 }
 
-func fetchUrkel(domain, server string) ([]byte, error) {
+func fetchOneUrkel(domain, server string) ([]byte, error) {
 	if !strings.HasSuffix(server, "/") {
 		server += "/"
 	}
 	url := server + domain + "?urkel"
-	response, err := http.Get(url)
+	client := http.Client{
+		Timeout: timeout,
+	}
+	response, err := client.Get(url)
+	// response, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("Error making GET request: %s", err)
 	}

@@ -22,10 +22,10 @@ func (t *tlsError) Error() string {
 }
 
 // newTLSConfig creates a new tls configuration capable of validating DANE.
-func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, roots []sync.BlockInfo, externalService string) *tls.Config {
+func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, roots []sync.BlockInfo, externalServices []string) *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify: true, // lgtm[go/disabled-certificate-check]
-		VerifyConnection:   verifyConnection(rrs, nameCheck, host, roots, externalService),
+		VerifyConnection:   verifyConnection(rrs, nameCheck, host, roots, externalServices),
 		ServerName:         host,
 		MinVersion:         tls.VersionTLS12,
 		// Supported TLS 1.2 cipher suites
@@ -45,7 +45,7 @@ func newTLSConfig(host string, rrs []*dns.TLSA, nameCheck bool, roots []sync.Blo
 }
 
 // verifyConnection returns a function that verifies the given tls connection state using the host and rrs
-func verifyConnection(rrs []*dns.TLSA, nameCheck bool, host string, roots []sync.BlockInfo, externalService string) func(cs tls.ConnectionState) error {
+func verifyConnection(rrs []*dns.TLSA, nameCheck bool, host string, roots []sync.BlockInfo, externalServices []string) func(cs tls.ConnectionState) error {
 	return func(cs tls.ConnectionState) error {
 		// the host can be ignored per RFC 7671. Not Before, Not After are ignored as well.
 		// https://tools.ietf.org/html/rfc7671
@@ -63,7 +63,7 @@ func verifyConnection(rrs []*dns.TLSA, nameCheck bool, host string, roots []sync
 				continue
 			}
 			if err := t.Verify(cs.PeerCertificates[0]); err == nil {
-				if err := prove.VerifyCertificateExtensions(roots, *cert, t, externalService); err != nil {
+				if err := prove.VerifyCertificateExtensions(roots, *cert, t, externalServices); err != nil {
 					debuglog.Logger.Debug(err)
 					return err
 				}

@@ -44,7 +44,7 @@ var (
 	hnsdPath           = flag.String("hnsd", os.Getenv("HNSD_PATH"), "path to hnsd executable, also may be set as environment variable HNSD_PATH")
 	hnsdCheckpointPath = flag.String("checkpoint", "", "path to hnsd checkpoint location, default ~/.hnsd")
 	resyncInterval     = flag.Duration("resync-interval", 24*time.Hour, "interval for roots resyncronization")
-	externalService    = flag.String("external-service", "", "uri to an external service providing SANE data")
+	externalService    = flag.String("external-service", "", "uri to an external service providing SANE data, can be a comma-separated list")
 )
 
 func getConfPath() string {
@@ -213,6 +213,8 @@ func main() {
 		return
 	}
 
+	services := strings.Split(*externalService, ",")
+
 	if *verbose {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
 		debuglog.Logger.Verbose = true
@@ -224,6 +226,9 @@ func main() {
 	if *hnsdCheckpointPath == "" {
 		home, _ := os.UserHomeDir() //above already fails if it doesn't exist
 		*hnsdCheckpointPath = path.Join(home, ".hnsd")
+		if err := os.MkdirAll(*hnsdCheckpointPath, 0777); err != nil {
+			log.Fatalf("error creating directory at %s : %s", *hnsdCheckpointPath, err)
+		}
 	}
 
 	sync.GetRoots(*hnsdPath, p, *hnsdCheckpointPath)
@@ -278,7 +283,7 @@ func main() {
 		SkipNameChecks:  *skipNameChecks,
 		Verbose:         *verbose,
 		RootsPath:       path.Join(p, "roots.json"),
-		ExternalService: *externalService,
+		ExternalService: services,
 	}
 	log.Printf("Listening on %s", *addr)
 	log.Fatal(c.Run(*addr))

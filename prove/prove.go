@@ -80,24 +80,24 @@ func verifyUrkelExt(extensionValue []byte, domain string, roots []sync.BlockInfo
 		for _, block := range roots {
 			// found tree root among stored ones
 			if hexstr == block.TreeRoot {
-				debuglog.Logger.Debug("found tree root ", hexstr, " from the certificate in the stored roots")
+				debuglog.Logger.Debug("found tree root", hexstr, "from the certificate in the stored roots")
 				return nil
 			}
 		}
 		extensionValue = extensionValue[32+*length:]
-		debuglog.Logger.Debug("could not find tree root ", hexstr, " from the certificate in the stored roots")
+		debuglog.Logger.Debug("could not find tree root", hexstr, "from the certificate in the stored roots")
 	}
 	return fmt.Errorf("could not find tree root in the stored ones")
 }
 
 // extracts proof data from the certificate then verifies if the proof is correct
-func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate, tlsa *dns.TLSA, externalService string) error {
+func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate, tlsa *dns.TLSA, externalServices []string) error {
 	if len(cert.DNSNames) == 0 {
 		return fmt.Errorf("certificate has empty dns names")
 	}
 
 	for _, domain := range cert.DNSNames {
-		err := verifyDomain(domain, cert, roots, tlsa, externalService)
+		err := verifyDomain(domain, cert, roots, tlsa, externalServices)
 		if err == nil {
 			debuglog.Logger.Debug("successfully verified certificate extensions for the domain " + domain)
 			return nil
@@ -108,7 +108,7 @@ func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate, 
 }
 
 // verifyDomain is called to check every domain listed in the certificate
-func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, tlsa *dns.TLSA, externalService string) error {
+func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, tlsa *dns.TLSA, externalServices []string) error {
 	var foundUrkel, foundDnssec bool
 	var urkelExtension, dnssecExtension []byte
 	var UrkelVerificationError, DNSSECVerificationError error = errors.New("urkel tree proof extension not found"), errors.New("DNSSEC chain extension not found")
@@ -129,23 +129,24 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 	}
 
 	if !foundUrkel {
-		if externalService == "" {
+		if len(externalServices) == 0 {
 			return fmt.Errorf("certificate does not have urkel proof extension and external service is disabled")
 		}
-		urkelExtension, err = fetchUrkel(domain, externalService)
+		urkelExtension, err = fetchUrkel(domain, externalServices)
 		if err != nil {
-			debuglog.Logger.Debugf("failed to fetch DNSSEC data from %s for the domain %s: %s", externalService, domain, err)
+			debuglog.Logger.Debugf("failed to fetch DNSSEC data from %s for the domain %s: %s", externalServices, domain, err)
 			return err
 		}
 	}
 
 	if !foundDnssec {
-		if externalService == "" {
+		if len(externalServices) == 0 {
+			// if externalServices == []"" {
 			return fmt.Errorf("certificate does not have dnssec chain extension and external service is disabled")
 		}
-		dnssecExtension, err = fetchDNSSEC(domain, externalService)
+		dnssecExtension, err = fetchDNSSEC(domain, externalServices)
 		if err != nil {
-			debuglog.Logger.Debugf("failed to fetch DNSSEC data from %s for the domain %s: %s", externalService, domain, err)
+			debuglog.Logger.Debugf("failed to fetch DNSSEC data from %s for the domain %s: %s", externalServices, domain, err)
 			return err
 		}
 	}
