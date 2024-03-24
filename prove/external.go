@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miekg/dns"
 	"github.com/randomlogin/sane/debuglog"
 )
 
@@ -22,8 +23,10 @@ type DNSSECJson struct {
 var timeout = 1 * time.Second
 
 func fetchDNSSEC(domain string, externalServices []string) ([]byte, error) {
+	labels := dns.SplitDomainName(domain)
+	tld := labels[len(labels)-1]
 	for _, link := range externalServices {
-		if result, err := fetchOneDNSSEC(domain, link); err == nil {
+		if result, err := fetchOneDNSSEC(tld, link); err == nil {
 			return result, nil
 		}
 		debuglog.Logger.Debugf("couldn't fetch dnssec data for domain %s from %s", domain, link)
@@ -32,8 +35,11 @@ func fetchDNSSEC(domain string, externalServices []string) ([]byte, error) {
 }
 
 func fetchUrkel(domain string, externalServices []string) ([]byte, error) {
+
+	labels := dns.SplitDomainName(domain)
+	tld := labels[len(labels)-1]
 	for _, link := range externalServices {
-		if result, err := fetchOneUrkel(domain, link); err == nil {
+		if result, err := fetchOneUrkel(tld, link); err == nil {
 			return result, nil
 		}
 		debuglog.Logger.Debugf("couldn't fetch urkel data for domain %s from %s", domain, link)

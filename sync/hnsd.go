@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -108,6 +109,14 @@ func PeriodicallySync(interval time.Duration, pathToExecutable, confPath, pathTo
 }
 
 func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string) {
+	if pathToCheckpoint == "" {
+		home, _ := os.UserHomeDir() //above already fails if it doesn't exist
+		pathToCheckpoint = path.Join(home, ".hnsd")
+	}
+	if err := os.MkdirAll(pathToCheckpoint, 0777); err != nil {
+		log.Fatalf("error creating directory at %s : %s", pathToCheckpoint, err)
+	}
+
 	rootPath := path.Join(confPath, rootsFileName)
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -120,12 +129,11 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 	}
 
 	signalChannel := make(chan os.Signal, 1)
-	scanner := bufio.NewScanner(stdoutPipe)
 	if err := cmd.Start(); err != nil {
 		log.Fatalf("Error starting command: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond) //wait 0.1 should suffice for the most of the computers
+	time.Sleep(100 * time.Millisecond) //0.1 second should suffice for the most of the computers
 	for i := 1; i <= secondsForHNSD; i++ {
 		if err := CheckHNSDVersion(); err == nil {
 			break
@@ -153,10 +161,6 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 			}
 
 			if cmd.Process != nil && isSynced {
-				myjson, _ := json.Marshal(slidingWindow)
-				if err := os.WriteFile(rootPath, myjson, 0777); err != nil {
-					log.Fatal(err)
-				}
 				if err := cmd.Process.Signal(syscall.SIGINT); err != nil {
 					log.Fatal("Error killing hnsd: ", err)
 				}
@@ -172,46 +176,72 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 		return
 	}()
 
-	re := regexp.MustCompile(`chain \((\d+)\): tree_root ([a-fA-F0-9]+) timestamp (\d+)`) // Regular expression for parsing output lines
+	parseAndWriteOutput(stdoutPipe, signalChannel, slidingWindow, rootPath)
+}
 
-	// Process command output
+func parseAndWriteOutput(stdoutPipe io.ReadCloser, signalChannel chan os.Signal, slidingWindow []BlockInfo, rootPath string) {
+	scanner := bufio.NewScanner(stdoutPipe)
+	re := regexp.MustCompile(`chain \((\d+)\): tree_root ([a-fA-F0-9]+) timestamp (\d+)`)
+	rejectRe := regexp.MustCompile(`chain \((\d+)\): +rejected:`)
+
+	var tempBlock *BlockInfo
+
 	for {
 		select {
 		case <-signalChannel:
+			myjson, _ := json.Marshal(slidingWindow)
+			if err := os.WriteFile(rootPath, myjson, 0777); err != nil {
+				log.Fatal(err)
+			}
 			return
 		default:
 			for scanner.Scan() {
 				line := scanner.Text()
-				match := re.FindStringSubmatch(line)
 
-				if len(match) >= 4 {
-					blockNumberStr, treeRoot, timestampStr := match[1], match[2], match[3]
-					blockNumber, err := strconv.ParseUint(blockNumberStr, 10, 32)
+				if rejectMatch := rejectRe.FindStringSubmatch(line); len(rejectMatch) >= 2 {
+					if tempBlock != nil {
+						tempBlock = nil // Discard the tempBlock as it has been rejected
+					}
+					continue
+				}
+
+				// Check for tree_root line
+				if match := re.FindStringSubmatch(line); len(match) >= 4 {
+					blockNumber, err := strconv.ParseUint(match[1], 10, 32)
 					if err != nil {
 						log.Printf("failed to parse block height: %v", err)
 						continue
 					}
-
-					timestamp, err := strconv.ParseUint(timestampStr, 10, 64)
+					timestamp, err := strconv.ParseUint(match[3], 10, 64)
 					if err != nil {
 						log.Printf("failed to parse timestamp: %v", err)
 						continue
 					}
+					treeRoot := match[2]
 
-					if !contains(slidingWindow, treeRoot) {
-						blockInfo := BlockInfo{
-							Height:    uint32(blockNumber),
-							Timestamp: timestamp,
-							TreeRoot:  treeRoot,
-						}
-
-						slidingWindow = append(slidingWindow, blockInfo)
+					// if there's a tempBlock already, add it to the slidingWindow
+					if tempBlock != nil {
+						slidingWindow = append(slidingWindow, *tempBlock)
 						if len(slidingWindow) > BlocksToStore {
 							slidingWindow = slidingWindow[1:]
 						}
 					}
+					tempBlock = &BlockInfo{
+						Height:    uint32(blockNumber),
+						Timestamp: timestamp,
+						TreeRoot:  treeRoot,
+					}
 				}
 			}
+			//add last block
+			if !scanner.Scan() && tempBlock != nil {
+				slidingWindow = append(slidingWindow, *tempBlock)
+				if len(slidingWindow) > BlocksToStore {
+					slidingWindow = slidingWindow[1:]
+				}
+			}
+
 		}
 	}
+
 }

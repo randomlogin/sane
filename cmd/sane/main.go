@@ -223,13 +223,6 @@ func main() {
 	if *hnsdPath == "" {
 		log.Fatal("path to hnsd is not provided")
 	}
-	if *hnsdCheckpointPath == "" {
-		home, _ := os.UserHomeDir() //above already fails if it doesn't exist
-		*hnsdCheckpointPath = path.Join(home, ".hnsd")
-		if err := os.MkdirAll(*hnsdCheckpointPath, 0777); err != nil {
-			log.Fatalf("error creating directory at %s : %s", *hnsdCheckpointPath, err)
-		}
-	}
 
 	sync.GetRoots(*hnsdPath, p, *hnsdCheckpointPath)
 	go func() {
