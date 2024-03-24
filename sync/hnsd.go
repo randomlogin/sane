@@ -220,7 +220,7 @@ func parseAndWriteOutput(stdoutPipe io.ReadCloser, signalChannel chan os.Signal,
 					treeRoot := match[2]
 
 					// if there's a tempBlock already, add it to the slidingWindow
-					if tempBlock != nil {
+					if tempBlock != nil && !contains(slidingWindow, tempBlock.TreeRoot) {
 						slidingWindow = append(slidingWindow, *tempBlock)
 						if len(slidingWindow) > BlocksToStore {
 							slidingWindow = slidingWindow[1:]
