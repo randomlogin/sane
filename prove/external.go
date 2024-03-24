@@ -23,10 +23,9 @@ type DNSSECJson struct {
 var timeout = 1 * time.Second
 
 func fetchDNSSEC(domain string, externalServices []string) ([]byte, error) {
-	labels := dns.SplitDomainName(domain)
-	tld := labels[len(labels)-1]
 	for _, link := range externalServices {
-		if result, err := fetchOneDNSSEC(tld, link); err == nil {
+		//fetch full domain
+		if result, err := fetchOneDNSSEC(domain, link); err == nil {
 			return result, nil
 		}
 		debuglog.Logger.Debugf("couldn't fetch dnssec data for domain %s from %s", domain, link)
@@ -39,6 +38,7 @@ func fetchUrkel(domain string, externalServices []string) ([]byte, error) {
 	labels := dns.SplitDomainName(domain)
 	tld := labels[len(labels)-1]
 	for _, link := range externalServices {
+		//fetch only tld
 		if result, err := fetchOneUrkel(tld, link); err == nil {
 			return result, nil
 		}
@@ -48,6 +48,7 @@ func fetchUrkel(domain string, externalServices []string) ([]byte, error) {
 }
 
 func fetchOneDNSSEC(domain, server string) ([]byte, error) {
+
 	if !strings.HasSuffix(server, "/") {
 		server += "/"
 	}

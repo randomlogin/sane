@@ -117,7 +117,16 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 		log.Fatalf("error creating directory at %s : %s", pathToCheckpoint, err)
 	}
 
+	//writes the empty array for the sync time
 	rootPath := path.Join(confPath, rootsFileName)
+	if _, err := os.Stat(rootPath); os.IsNotExist(err) {
+		if err := os.WriteFile(rootPath, []byte("[]"), 0644); err != nil {
+			log.Fatal(err)
+		}
+	} else if err != nil {
+		log.Fatal(err)
+	}
+
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(ctx, pathToExecutable, "-n", dnsAddress, "-p", "4", "-r", "127.0.0.1:12345", "-t", "-x", pathToCheckpoint)

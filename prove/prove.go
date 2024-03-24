@@ -141,7 +141,6 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 
 	if !foundDnssec {
 		if len(externalServices) == 0 {
-			// if externalServices == []"" {
 			return fmt.Errorf("certificate does not have dnssec chain extension and external service is disabled")
 		}
 		dnssecExtension, err = fetchDNSSEC(domain, externalServices)
