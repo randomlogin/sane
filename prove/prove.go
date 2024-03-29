@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/miekg/dns"
 	"github.com/randomlogin/sane/debuglog"
@@ -95,9 +96,14 @@ func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate, 
 	if len(cert.DNSNames) == 0 {
 		return fmt.Errorf("certificate has empty dns names")
 	}
+	labels := dns.SplitDomainName(tlsa.Header().Name)
+	if len(labels) < 3 {
+		return fmt.Errorf("tlsa record has less than 3 labels")
+	}
+	tlsaDomain := strings.Join(labels[2:], ".")
 
 	for _, domain := range cert.DNSNames {
-		err := verifyDomain(domain, cert, roots, tlsa, externalServices)
+		err := verifyDomain(tlsaDomain, cert, roots, tlsa, externalServices)
 		if err == nil {
 			debuglog.Logger.Debug("successfully verified certificate extensions for the domain " + domain)
 			return nil
