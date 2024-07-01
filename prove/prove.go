@@ -6,11 +6,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/miekg/dns"
 	"github.com/randomlogin/sane/debuglog"
-	"github.com/randomlogin/sane/dnssec"
 	"github.com/randomlogin/sane/sync"
 	"golang.org/x/crypto/sha3"
 
@@ -101,6 +101,8 @@ func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate, 
 		return fmt.Errorf("tlsa record has less than 3 labels")
 	}
 	tlsaDomain := strings.Join(labels[2:], ".")
+	log.Print(tlsaDomain)
+	log.Print(tlsa)
 
 	for _, domain := range cert.DNSNames {
 		err := verifyDomain(tlsaDomain, cert, roots, tlsa, externalServices)
@@ -161,13 +163,13 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 		debuglog.Logger.Debugf("failed to verify urkel proof: %s", UrkelVerificationError)
 		return UrkelVerificationError
 	}
-	records, err := dnssec.ParseExt(dnssecExtension)
+	records, err := ParseExt(dnssecExtension)
 	if err != nil {
 		debuglog.Logger.Debugf("failed to parse DNSSEC extension: %s", err)
 		return err
 	}
 
-	DNSSECVerificationError = dnssec.VerifyDNSSECChain(records, domain, tlsa)
+	DNSSECVerificationError = VerifyDNSSECChain(records, domain, tlsa)
 	if DNSSECVerificationError != nil {
 		debuglog.Logger.Debugf("failed to verify DNSSEC chain: %s", DNSSECVerificationError)
 		return DNSSECVerificationError

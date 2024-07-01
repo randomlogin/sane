@@ -20,7 +20,7 @@ type DNSSECJson struct {
 	Dnssec string `json:"dnssec"`
 }
 
-var timeout = 1 * time.Second
+var timeout = 10 * time.Second
 
 func fetchDNSSEC(domain string, externalServices []string) ([]byte, error) {
 	for _, link := range externalServices {
@@ -34,7 +34,6 @@ func fetchDNSSEC(domain string, externalServices []string) ([]byte, error) {
 }
 
 func fetchUrkel(domain string, externalServices []string) ([]byte, error) {
-
 	labels := dns.SplitDomainName(domain)
 	tld := labels[len(labels)-1]
 	for _, link := range externalServices {
@@ -70,6 +69,7 @@ func fetchOneDNSSEC(domain, server string) ([]byte, error) {
 		return nil, fmt.Errorf("error decoding JSON: %s", err)
 	}
 
+	// log.Print(data.Dnssec, "\n")
 	val, err := hex.DecodeString(data.Dnssec)
 	if err != nil {
 		return nil, err

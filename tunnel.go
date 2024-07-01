@@ -101,7 +101,10 @@ func (h *tunneler) Tunnel(ctx context.Context, clientConn *proxy.Conn, network, 
 		return
 	}
 
+	log.Print(addrs.Host)
+	log.Print("tlsas", tlsa)
 	tlsaDomain := addrs.Host
+	log.Print(tlsaDomain)
 	if tlsaDomain != hello.ServerName {
 		h.warnf("client sni `%s` does not match tlsa domain `%s`", statusErr, addr, hello.ServerName, tlsaDomain)
 		return

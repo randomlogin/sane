@@ -1,15 +1,16 @@
-package dnssec
+package prove
 
 import (
 	"errors"
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/miekg/dns"
 )
 
-const dnssecExt = "1.3.6.1.4.1.54392.5.1621"
+// const dnssecExt = "1.3.6.1.4.1.54392.5.1621"
 const rootKey = ". 10 IN DNSKEY 257 3 13 T9cURJ2M/Mz9q6UsZNY+Ospyvj+Uv+tgrrWkLtPQwgU/Xu5Yk0l02Sn5ua2xAQfEYIzRO6v5iA+BejMeEwNP4Q=="
 
 //TODO split code into smaller functions
@@ -28,6 +29,7 @@ func parseRootKey() *dns.DNSKEY {
 	return dnsKey
 }
 
+// Parses data from certificate extension, returns a list of RRs
 func ParseExt(extval []byte) ([]dns.RR, error) {
 	var records []dns.RR
 	off := 4 //4 bytes of non-relevant data, namely port and value (of what?)
@@ -66,7 +68,6 @@ func ParseExt(extval []byte) ([]dns.RR, error) {
 // TODO distinguish KSK and ZSK
 // expects the records to be sorted by domain name length descending (root zone is the last)
 func VerifyDNSSECChain(records []dns.RR, domain string, dns_tlsa *dns.TLSA) error {
-
 	var tlsas []*dns.TLSA
 	var dss []*dns.DS
 	var rrsigs []*dns.RRSIG
@@ -98,6 +99,23 @@ func VerifyDNSSECChain(records []dns.RR, domain string, dns_tlsa *dns.TLSA) erro
 	//checks if in DNSSEC chain there exists a TLSA record which equals to the one used in connection
 	if !slices.ContainsFunc(tlsas, func(a *dns.TLSA) bool { return dns.IsDuplicate(a, dns_tlsa) }) {
 		return fmt.Errorf("TLSA records from extension do not correspond to the server ones")
+	}
+
+	domainCovered := false
+	for _, tlsa := range tlsas {
+		tlsaLabels := dns.SplitDomainName(tlsa.Hdr.Name)
+		if len(tlsaLabels) < 3 {
+			return fmt.Errorf("TLSA records had less than 3 labels")
+		}
+		child := dns.Fqdn(strings.Join(tlsaLabels[2:], "."))
+		if child == dns.Fqdn(domain) {
+			domainCovered = true
+			break
+		}
+	}
+
+	if !domainCovered {
+		return fmt.Errorf("no TLSA record covers the domain %s", domain)
 	}
 
 	//iterating through all records to return a slice of slices, they represent levels, it means
@@ -278,8 +296,8 @@ func verifyLevel(level []dns.RR, parentKeys []*dns.DNSKEY) ([]*dns.DNSKEY, error
 
 // exclusive compare which return false of the domains are equal
 func isStrictParentDomain(parent, child *dns.RR) bool {
-	parentLabel := (*parent).Header().Name
-	childLabel := (*child).Header().Name
+	parentLabel := dns.Fqdn((*parent).Header().Name)
+	childLabel := dns.Fqdn((*child).Header().Name)
 	if parentLabel == childLabel {
 		return false
 	}
