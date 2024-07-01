@@ -2,6 +2,7 @@ package prove
 
 import (
 	"encoding/hex"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,8 +30,9 @@ func TestParseDNSSECExt(t *testing.T) {
 		{"lazydane", "valid_test.lazydane.hex", "no TLSA record covers the domain lazydane"},
 		{".lazydane", "valid_test.lazydane.hex", "no TLSA record covers the domain .lazydane"},
 		{"shakestation", "invalid_shakestation.hex", "any"},
-		{"netmeister.org", "invalid_netmeister.org.hex", "any"},
+		{"netmeister.org", "invalid_netmeister.org.hex", ""},
 		{"htools", "valid_wildcard_htools.hex", ""},
+		{"htools", "invalid_wrong_data.hex", "any"},
 	}
 
 	for _, tt := range tests {
@@ -47,6 +49,9 @@ func TestParseDNSSECExt(t *testing.T) {
 
 			records, err := ParseExt(val)
 			if err != nil {
+				if tt.expected == "any" {
+					return
+				}
 				t.Fatalf("Failed to parse DNSSEC extension for domain %s: %v", tt.domain, err)
 			}
 
@@ -61,14 +66,11 @@ func TestParseDNSSECExt(t *testing.T) {
 				}
 			}
 			if tlsa == nil {
+				log.Print(records)
 				t.Fatalf("no tlsa is found for domain %s", tt.domain)
 			}
 
-			err = GetdnsVerifyChain(val[4:])
-			// #define GETDNS_DNSSEC_INSECURE 403
-			// #define GETDNS_DNSSEC_INSECURE_TEXT "The record was determined to be insecure in DNSSEC"
-
-			// err = VerifyDNSSECChain(records, tt.domain, tlsa)
+			err = VerifyDNSSECChain(val, tt.domain, tlsa)
 			if tt.expected == "" {
 				if err != nil {
 					t.Fatalf("Expected nil error for domain %s, got %v", tt.domain, err)

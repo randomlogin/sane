@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/miekg/dns"
-	"github.com/randomlogin/sane/debuglog"
 	"github.com/randomlogin/sane/sync"
 	"golang.org/x/crypto/sha3"
 
@@ -68,25 +67,25 @@ func verifyUrkelExt(extensionValue []byte, domain string, roots []sync.BlockInfo
 		hexstr := hex.EncodeToString(certRoot)
 
 		if len(extensionValue) < 32 {
-			debuglog.Logger.Debug("urkel proof is empty")
+			log.Print("urkel proof is empty")
 			return fmt.Errorf("urkel data is corrupted")
 		}
 		certProof := extensionValue[32:]
 		length, err := checkProof(certProof, certRoot, key)
 		if err != nil {
 			//found invalid proof
-			debuglog.Logger.Debugf("urkel verification failed: %s", err)
+			log.Printf("urkel verification failed: %s", err)
 			return err
 		}
 		for _, block := range roots {
 			// found tree root among stored ones
 			if hexstr == block.TreeRoot {
-				debuglog.Logger.Debug("found tree root", hexstr, "from the certificate in the stored roots")
+				log.Printf("found tree root %s from the certificate in the stored roots", hexstr)
 				return nil
 			}
 		}
 		extensionValue = extensionValue[32+*length:]
-		debuglog.Logger.Debug("could not find tree root", hexstr, "from the certificate in the stored roots")
+		log.Print("could not find tree root", hexstr, "from the certificate in the stored roots")
 	}
 	return fmt.Errorf("could not find tree root in the stored ones")
 }
@@ -101,16 +100,14 @@ func VerifyCertificateExtensions(roots []sync.BlockInfo, cert x509.Certificate, 
 		return fmt.Errorf("tlsa record has less than 3 labels")
 	}
 	tlsaDomain := strings.Join(labels[2:], ".")
-	log.Print(tlsaDomain)
-	log.Print(tlsa)
 
 	for _, domain := range cert.DNSNames {
 		err := verifyDomain(tlsaDomain, cert, roots, tlsa, externalServices)
 		if err == nil {
-			debuglog.Logger.Debug("successfully verified certificate extensions for the domain " + domain)
+			log.Printf("successfully verified certificate extensions for the domain %s", domain)
 			return nil
 		}
-		debuglog.Logger.Debugf("got error: %s during verification domain %s", err, domain)
+		log.Printf("got error: %s during verification domain %s", err, domain)
 	}
 	return fmt.Errorf("failed to verify certificate extensions")
 }
@@ -142,7 +139,7 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 		}
 		urkelExtension, err = fetchUrkel(domain, externalServices)
 		if err != nil {
-			debuglog.Logger.Debugf("failed to fetch DNSSEC data from %s for the domain %s: %s", externalServices, domain, err)
+			log.Printf("failed to fetch DNSSEC data from %s for the domain %s: %s", externalServices, domain, err)
 			return err
 		}
 	}
@@ -153,30 +150,24 @@ func verifyDomain(domain string, cert x509.Certificate, roots []sync.BlockInfo, 
 		}
 		dnssecExtension, err = fetchDNSSEC(domain, externalServices)
 		if err != nil {
-			debuglog.Logger.Debugf("failed to fetch DNSSEC data from %s for the domain %s: %s", externalServices, domain, err)
+			log.Printf("failed to fetch DNSSEC data from %s for the domain %s: %s", externalServices, domain, err)
 			return err
 		}
 	}
 
 	UrkelVerificationError = verifyUrkelExt(urkelExtension, tld, roots)
 	if UrkelVerificationError != nil {
-		debuglog.Logger.Debugf("failed to verify urkel proof: %s", UrkelVerificationError)
+		log.Printf("failed to verify urkel proof: %s", UrkelVerificationError)
 		return UrkelVerificationError
 	}
-	records, err := ParseExt(dnssecExtension)
-	if err != nil {
-		debuglog.Logger.Debugf("failed to parse DNSSEC extension: %s", err)
-		return err
-	}
 
-	DNSSECVerificationError = VerifyDNSSECChain(records, domain, tlsa)
+	DNSSECVerificationError = VerifyDNSSECChain(dnssecExtension, domain, tlsa)
 	if DNSSECVerificationError != nil {
-		debuglog.Logger.Debugf("failed to verify DNSSEC chain: %s", DNSSECVerificationError)
+		log.Printf("failed to verify DNSSEC chain: %s", DNSSECVerificationError)
 		return DNSSECVerificationError
 	}
 
 	if (UrkelVerificationError == nil) && (DNSSECVerificationError == nil) {
-		debuglog.Logger.Debug("DANE extensions from certificate are both valid")
 		return nil
 	} else {
 		return fmt.Errorf("could not verify SANE for the domain %s: %s, %s", domain, UrkelVerificationError, DNSSECVerificationError)

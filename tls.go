@@ -4,11 +4,11 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
 	"github.com/miekg/dns"
-	"github.com/randomlogin/sane/debuglog"
 	"github.com/randomlogin/sane/prove"
 	"github.com/randomlogin/sane/sync"
 )
@@ -64,7 +64,7 @@ func verifyConnection(rrs []*dns.TLSA, nameCheck bool, host string, roots []sync
 			}
 			if err := t.Verify(cs.PeerCertificates[0]); err == nil {
 				if err := prove.VerifyCertificateExtensions(roots, *cert, t, externalServices); err != nil {
-					debuglog.Logger.Debug(err)
+					log.Print(err)
 					return err
 				}
 				return nil

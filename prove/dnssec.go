@@ -4,30 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/miekg/dns"
 )
-
-// const dnssecExt = "1.3.6.1.4.1.54392.5.1621"
-const rootKey = ". 10 IN DNSKEY 257 3 13 T9cURJ2M/Mz9q6UsZNY+Ospyvj+Uv+tgrrWkLtPQwgU/Xu5Yk0l02Sn5ua2xAQfEYIzRO6v5iA+BejMeEwNP4Q=="
-
-//TODO split code into smaller functions
-//TODO check function arguments, set them to pointers where possible
-//TODO verify the dependencies, remove the unused ones
-//TODO add several TLSA records support (so rrsig would be a valid one)
-
-func parseRootKey() *dns.DNSKEY {
-	rr, err := dns.NewRR(rootKey)
-	if err != nil {
-		err := fmt.Errorf("error reading root zone DNSKEY %s", err)
-		fmt.Print(err.Error())
-		return nil
-	}
-	dnsKey := rr.(*dns.DNSKEY)
-	return dnsKey
-}
 
 // Parses data from certificate extension, returns a list of RRs
 func ParseExt(extval []byte) ([]dns.RR, error) {
@@ -53,46 +33,19 @@ func ParseExt(extval []byte) ([]dns.RR, error) {
 	return records, nil
 }
 
-// getRecordsFromCertificate returns records from certificate's dnssec extensions, the output is sorted by domain name, ascending
-// for example: "_443._tcp.domain.", "domain.", ".", it does not impose any assumptions on records or certificate
-// func GetRecordsFromCertificate(cert x509.Certificate) ([]dns.RR, error) {
-// 	for _, ext := range cert.Extensions {
-// 		if ext.Id.String() == dnssecExt {
-// 			return ParseExt(ext.Value)
-// 		}
-// 	}
-// 	return nil, errors.New("could not find the right certificate extension")
-// }
-
-// ZSK and KSK distinction is ephemeral: https://datatracker.ietf.org/doc/html/rfc6781#section-3.1
-// TODO distinguish KSK and ZSK
-// expects the records to be sorted by domain name length descending (root zone is the last)
-func VerifyDNSSECChain(records []dns.RR, domain string, dns_tlsa *dns.TLSA) error {
+func VerifyDNSSECChain(chainWireData []byte, domain string, dns_tlsa *dns.TLSA) error {
+	records, err := ParseExt(chainWireData)
+	if err != nil {
+		// debuglog.Logger.Debugf("failed to parse DNSSEC extension: %s", err)
+		return err
+	}
 	var tlsas []*dns.TLSA
-	var dss []*dns.DS
-	var rrsigs []*dns.RRSIG
-	var dnskeys []*dns.DNSKEY
-	less := func(a, b int) bool { return !isStrictParentDomain(&records[a], &records[b]) }
-	sort.Slice(records, less)
-	// myprintslice(records)
-
 	for i := 0; i < len(records); i++ {
 		record := records[i]
 		switch record.(type) {
 		case *dns.TLSA:
 			r := record.(*dns.TLSA)
 			tlsas = append(tlsas, r)
-		case *dns.DS:
-			r := record.(*dns.DS)
-			dss = append(dss, r)
-		case *dns.RRSIG:
-			r := record.(*dns.RRSIG)
-			rrsigs = append(rrsigs, r)
-		case *dns.DNSKEY:
-			r := record.(*dns.DNSKEY)
-			dnskeys = append(dnskeys, r)
-		default:
-			return errors.New("found a record which is neither TLSA, nor DS, nor RRSIG, nor DNSKEY, aborting")
 		}
 	}
 
@@ -118,222 +71,5 @@ func VerifyDNSSECChain(records []dns.RR, domain string, dns_tlsa *dns.TLSA) erro
 		return fmt.Errorf("no TLSA record covers the domain %s", domain)
 	}
 
-	//iterating through all records to return a slice of slices, they represent levels, it means
-	//there is a distinct level for each label in the domain, one level for the root zone, one for the top level domain and so on
-	slices.Reverse(records)
-	var levels []([]dns.RR)
-	var j int //last level to which i've added elements
-	for i, rec := range records {
-		if i == 0 {
-			levels = append(levels, []dns.RR{rec})
-			continue
-		}
-		if i == len(records)-1 {
-			levels[j] = append(levels[j], rec)
-			break
-		}
-		if isStrictParentDomain(&rec, &(records[i+1])) {
-			levels[j] = append(levels[j], rec)
-			j = j + 1
-			levels = append(levels, []dns.RR{})
-		} else {
-			levels[j] = append(levels[j], rec)
-		}
-	}
-
-	if len(levels) <= 1 {
-		return errors.New("found not enough levels of records")
-	}
-
-	//handling of the root zone
-	//taking root trust anchor from the topmost level
-	rootDNSKEY, err := findRootDNSKEY(levels[0])
-	if err != nil {
-		return err
-	}
-
-	//take all DNSKEY records from the rootzone, they are used to verify root RRSIG
-	var rootZoneKeys []*dns.DNSKEY
-	var rootRRSIG *dns.RRSIG
-
-	for _, record := range levels[0] {
-		dnskey, ok := record.(*dns.DNSKEY)
-		if ok {
-			rootZoneKeys = append(rootZoneKeys, dnskey)
-			continue
-		}
-		rootRRSIG, ok = record.(*dns.RRSIG)
-		if ok {
-			if rootRRSIG.TypeCovered != dns.TypeDNSKEY {
-				return fmt.Errorf("found root RRSIG corresponding not to DNSKEY, but to the record %s", rootRRSIG)
-			}
-		}
-	}
-	if rootRRSIG == nil {
-		return errors.New("could not find root zone RRSIG")
-	}
-
-	var rootzonerrset []dns.RR
-	for _, ds := range rootZoneKeys {
-		rootzonerrset = append(rootzonerrset, ds)
-	}
-
-	if !dns.IsRRset(rootzonerrset) {
-		return errors.New("DNSKEYS do not form a valid RRset")
-	}
-
-	//verifies root rrsig using root dns key
-	err = rootRRSIG.Verify(rootDNSKEY, rootzonerrset)
-	if err != nil {
-		return err
-	}
-	//root zone is verified
-
-	//so now we can go to the main loop of taking DS, then DNSKEY and then go further
-	parents := rootZoneKeys
-	for _, level := range levels[1:] {
-		parents, err = verifyLevel(level, parents)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// keys for the next level are output
-func verifyLevel(level []dns.RR, parentKeys []*dns.DNSKEY) ([]*dns.DNSKEY, error) {
-	var tlsas []*dns.TLSA
-	var dss []*dns.DS
-	var rrsigs []*dns.RRSIG
-	var dnskeys []*dns.DNSKEY
-
-	//splitting records by their type
-	for _, record := range level {
-		switch record.(type) {
-		case *dns.TLSA:
-			r := record.(*dns.TLSA)
-			tlsas = append(tlsas, r)
-		case *dns.DS:
-			r := record.(*dns.DS)
-			dss = append(dss, r)
-		case *dns.RRSIG:
-			r := record.(*dns.RRSIG)
-			rrsigs = append(rrsigs, r)
-		case *dns.DNSKEY:
-			r := record.(*dns.DNSKEY)
-			dnskeys = append(dnskeys, r)
-		default:
-			return nil, errors.New("found a record which is neither TLSA, nor DS, nor RRSIG, nor DNSKEY")
-		}
-	}
-
-	if len(tlsas) != 0 {
-		var tlsas_rr []dns.RR
-		for _, tlsa := range tlsas {
-			tlsas_rr = append(tlsas_rr, (dns.RR(tlsa)))
-		}
-		for _, rrsig_tlsa := range rrsigs {
-			if rrsig_tlsa.TypeCovered == dns.TypeTLSA {
-				_, err := verifyRRSIGWithDNSKEYs(parentKeys, rrsig_tlsa, tlsas_rr)
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
-		//it's the last level, we don't have DNSKEYs there
-		return nil, nil
-	}
-
-	//DS handling
-	//if i have DS it should have rrsig which is signed by key
-	if len(dss) != 0 {
-		var rrs []dns.RR
-		for _, ds := range dss {
-			rrs = append(rrs, ds)
-		}
-		for _, rrsig_ds := range rrsigs {
-			if rrsig_ds.TypeCovered == dns.TypeDS {
-				_, err := verifyRRSIGWithDNSKEYs(parentKeys, rrsig_ds, rrs)
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
-	}
-
-	//DNSKEY handling
-	//if there is a DNSKEY it should have RRSIG signed by this a key which called KSK, it should have DS
-	if len(dnskeys) != 0 {
-		//change dnskeys to RRset
-		var rrs []dns.RR
-		for _, dskey := range dnskeys {
-			rrs = append(rrs, dskey)
-		}
-		//check that rrsig of dnskeys is signed by ksk
-		var ksk *dns.DNSKEY
-		var err error
-		for _, rrsigDNSKEY := range rrsigs {
-			if rrsigDNSKEY.TypeCovered == dns.TypeDNSKEY {
-				ksk, err = verifyRRSIGWithDNSKEYs(dnskeys, rrsigDNSKEY, rrs)
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
-		//check that ksk has ds
-		dnskeyToDSed := ksk.ToDS(dns.SHA256)
-		var kskHasDS bool
-		for _, ds := range dss {
-			kskHasDS = kskHasDS || dns.IsDuplicate(dnskeyToDSed, ds)
-		}
-		if !kskHasDS {
-			return nil, errors.New("could not find DS for Key Signing Key")
-		}
-	}
-
-	return dnskeys, nil
-}
-
-// exclusive compare which return false of the domains are equal
-func isStrictParentDomain(parent, child *dns.RR) bool {
-	parentLabel := dns.Fqdn((*parent).Header().Name)
-	childLabel := dns.Fqdn((*child).Header().Name)
-	if parentLabel == childLabel {
-		return false
-	}
-	return dns.IsSubDomain(parentLabel, childLabel)
-}
-
-// debug
-func myprintslice(qq []dns.RR) {
-	for _, x := range qq {
-		fmt.Println(x.Header(), " ")
-	}
-}
-
-// findRootDNSKEY verifies that root key (global constant) exists in the provided slice of dns.DNSKEY, returns it if successful
-func findRootDNSKEY(keys []dns.RR) (*dns.DNSKEY, error) {
-	rootKey := parseRootKey()
-	for _, dnskey := range keys {
-		if dns.IsDuplicate(dnskey, rootKey) {
-			return rootKey, nil
-		}
-	}
-	return nil, errors.New("could not find root DNSKEY")
-}
-
-// takes a slice of dnskeys and an RRSIG and tries to verify rrsig using that key
-func verifyRRSIGWithDNSKEYs(dnskeys []*dns.DNSKEY, rrsig *dns.RRSIG, rrs []dns.RR) (*dns.DNSKEY, error) {
-	ok := dns.IsRRset(rrs)
-	if !ok {
-		return nil, fmt.Errorf("provided records do not form correct RRset")
-	}
-	for _, DNSKey := range dnskeys {
-		err := rrsig.Verify(DNSKey, rrs)
-		if err == nil {
-			return DNSKey, nil
-		}
-	}
-	return nil, fmt.Errorf("could not verify RRSIG for the type %s using provided DNSKEYs", dns.TypeToString[rrsig.TypeCovered])
-
+	return GetdnsVerifyChain(chainWireData[4:])
 }

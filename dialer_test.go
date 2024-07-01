@@ -28,7 +28,7 @@ func TestDialTLS(t *testing.T) {
 	addrs.IPs = []net.IP{net.ParseIP("255.255.255.255"), net.ParseIP(ip)}
 
 	tlsa := newTLSA(3, 1, 1, srv.Certificate())
-	config := newTLSConfig("", tlsa, false)
+	config := newTLSConfig("", tlsa, false, nil, nil)
 
 	conn, err := d.dialTLSContext(context.Background(), "tcp", addrs, config)
 	if err != nil {

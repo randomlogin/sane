@@ -4,6 +4,6 @@
 #include <stdint.h>
 #include <stddef.h> // For size_t
 
-int check_dnssec(uint8_t *dns_record_wire, size_t dns_record_wire_len);
+int validate_dnssec(uint8_t *dns_record_wire, size_t dns_record_wire_len);
 
 #endif // DNSSEC_H

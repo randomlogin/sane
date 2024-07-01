@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
-	"github.com/randomlogin/sane/debuglog"
 )
 
 type UrkelJson struct {
@@ -28,7 +27,6 @@ func fetchDNSSEC(domain string, externalServices []string) ([]byte, error) {
 		if result, err := fetchOneDNSSEC(domain, link); err == nil {
 			return result, nil
 		}
-		debuglog.Logger.Debugf("couldn't fetch dnssec data for domain %s from %s", domain, link)
 	}
 	return nil, fmt.Errorf("could not fetch any external services")
 }
@@ -41,13 +39,11 @@ func fetchUrkel(domain string, externalServices []string) ([]byte, error) {
 		if result, err := fetchOneUrkel(tld, link); err == nil {
 			return result, nil
 		}
-		debuglog.Logger.Debugf("couldn't fetch urkel data for domain %s from %s", domain, link)
 	}
 	return nil, fmt.Errorf("could not fetch any external services")
 }
 
 func fetchOneDNSSEC(domain, server string) ([]byte, error) {
-
 	if !strings.HasSuffix(server, "/") {
 		server += "/"
 	}
@@ -69,7 +65,6 @@ func fetchOneDNSSEC(domain, server string) ([]byte, error) {
 		return nil, fmt.Errorf("error decoding JSON: %s", err)
 	}
 
-	// log.Print(data.Dnssec, "\n")
 	val, err := hex.DecodeString(data.Dnssec)
 	if err != nil {
 		return nil, err
@@ -86,7 +81,6 @@ func fetchOneUrkel(domain, server string) ([]byte, error) {
 		Timeout: timeout,
 	}
 	response, err := client.Get(url)
-	// response, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("Error making GET request: %s", err)
 	}

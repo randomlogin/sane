@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"log"
 	"testing"
 
 	"github.com/miekg/dns"
@@ -70,7 +71,8 @@ A0EA1wQgxtVuzgpd9kKDQhheJGQyaQzcZwAR7k215Fi/h0UTLb0jwOB+YUqd3eTn
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c := newTLSConfig(test.host, test.rr, test.nameCheck)
+			log.Print(test.rr)
+			c := newTLSConfig(test.host, test.rr, test.nameCheck, nil, nil)
 			err := c.VerifyConnection(tls.ConnectionState{PeerCertificates: peerCerts})
 
 			if err != nil && test.valid {

@@ -18,7 +18,6 @@ import (
 	"github.com/buffrr/hsig0"
 	"github.com/miekg/dns"
 	sane "github.com/randomlogin/sane"
-	"github.com/randomlogin/sane/debuglog"
 	rs "github.com/randomlogin/sane/resolver"
 	"github.com/randomlogin/sane/sync"
 	"github.com/randomlogin/sane/tld"
@@ -217,7 +216,7 @@ func main() {
 
 	if *verbose {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
-		debuglog.Logger.Verbose = true
+		// 	debuglog.Logger.Verbose = true
 	}
 
 	if *hnsdPath == "" {
