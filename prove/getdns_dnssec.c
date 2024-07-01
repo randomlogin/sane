@@ -99,7 +99,7 @@ int validate_dnssec(uint8_t *dns_record_wire, size_t dns_record_wire_len) {
   /* printf("trust anchors\n"); */
   /* print_list(trust_anchors); */
 
-  r = getdns_validate_dnssec2(to_validate, chain_support, trust_anchors, time(NULL), 500 * 30 * 24 * 60 * 60);
+  r = getdns_validate_dnssec2(to_validate, chain_support, trust_anchors, time(NULL), 7 * 30 * 24 * 60 * 60);
   return r;
 }
 

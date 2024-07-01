@@ -28,7 +28,7 @@ func fetchDNSSEC(domain string, externalServices []string) ([]byte, error) {
 			return result, nil
 		}
 	}
-	return nil, fmt.Errorf("could not fetch any external services")
+	return nil, fmt.Errorf("could not fetch any external services to obtain a DNSSEC chain")
 }
 
 func fetchUrkel(domain string, externalServices []string) ([]byte, error) {
@@ -40,7 +40,7 @@ func fetchUrkel(domain string, externalServices []string) ([]byte, error) {
 			return result, nil
 		}
 	}
-	return nil, fmt.Errorf("could not fetch any external services")
+	return nil, fmt.Errorf("could not fetch any external services to obtain an urkel tree")
 }
 
 func fetchOneDNSSEC(domain, server string) ([]byte, error) {

@@ -216,7 +216,6 @@ func main() {
 
 	if *verbose {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
-		// 	debuglog.Logger.Verbose = true
 	}
 
 	if *hnsdPath == "" {

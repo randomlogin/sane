@@ -10,7 +10,7 @@ import (
 )
 
 // Parses data from certificate extension, returns a list of RRs
-func ParseExt(extval []byte) ([]dns.RR, error) {
+func parseExt(extval []byte) ([]dns.RR, error) {
 	var records []dns.RR
 	off := 4 //4 bytes of non-relevant data, namely port and value (of what?)
 	var rr dns.RR
@@ -33,8 +33,8 @@ func ParseExt(extval []byte) ([]dns.RR, error) {
 	return records, nil
 }
 
-func VerifyDNSSECChain(chainWireData []byte, domain string, dns_tlsa *dns.TLSA) error {
-	records, err := ParseExt(chainWireData)
+func verifyDNSSECChain(chainWireData []byte, domain string, dns_tlsa *dns.TLSA) error {
+	records, err := parseExt(chainWireData)
 	if err != nil {
 		// debuglog.Logger.Debugf("failed to parse DNSSEC extension: %s", err)
 		return err

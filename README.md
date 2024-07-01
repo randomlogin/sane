@@ -17,6 +17,13 @@ Internal hnsd daemon has `5350` as a default port.
 
 ## Install
 
+Dependencies:
+```
+apt-get install libgtetnds-dev
+```
+
+Actual build
+
 ```
 git clone https://github.com/randomlogin/sane.git && cd sane/cmd/sane
 go build 
@@ -39,7 +46,7 @@ export HNSD_PATH="~/hnsd/hnsd"
 ./sane -r https://hnsdoh.com
 ```
 
-An additional parameter can be added: the external server which exctracts both DNSSEC and urkel proof for the domain,
+An additional parameter can be added: the external server which provides both DNSSEC and urkel proof for the domain,
 which allows to browse websites without SANE-compliant certificates (of course this external service must be trusted).
 
 ```
@@ -57,29 +64,25 @@ older than a week.\
 Native [golang implementation of urkel tree](https://github.com/nodech/go-hsd-utils/) is used.
 
 ### DNSSEC
-Another extension from the certificate contains DNSSEC verifiation chain, it is verified in the following way:
+Another extension from the certificate contains DNSSEC verifiation chain. Its verification is done locally using
+[getdns](https://getdnsapi.net/), it does not call any resolvers.
 
-1. Records from the extension are read, abort if there are any records except: TLSA, RRSIG, DNSKEY, DS.
-2. The records are linearly sorted by 'subdomain' relation. Abort if it cannot be done.
-3. The only TLSA record is found and used for chain verification. Abort if there are several TLSA records.
-4. The chain TLSA -> RRSIG -> DS & DNSKEY up to the root zone is verified, abort if there is an error.
 
 ### Browser settings
 - Add SANE proxy to your web browser `127.0.0.1:8080` ([Firefox example](https://user-images.githubusercontent.com/41967894/117558156-8f5b2a00-b02f-11eb-98ba-91ce8a9bdd4a.png))
 - Import the certificate file into your browser certificate store ([Firefox example](https://user-images.githubusercontent.com/41967894/117558164-a7cb4480-b02f-11eb-93ed-678f81f25f2e.png)).
 
-
 ### Requirements
 Go 1.21+ is required. \
 hnsd 2.99.0+ is required.
 
-
 ### Example websites
 
-Following websites have SANE-compliant ceritifcates:
-- [collate/](https://collate/) 
+Following websites provide examples of websites compliant with SANE (including wildcard certificates):
+- [htools/](https://htools/) 
 - [test.lazydane/](https://test.lazydane/) 
 
 ## Debug
 
-Some additional information is output with `--verbose` flag.
+Default output log provides sufficient information about what is happening, though additional `--verbose` flag might
+help to locate the exact code locations where the logging comes from. 
