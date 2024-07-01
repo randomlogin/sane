@@ -19,7 +19,7 @@ Internal hnsd daemon has `5350` as a default port.
 
 Dependencies:
 ```
-apt-get install libgtetnds-dev
+apt-get install libgetdns-dev
 ```
 
 Actual build
