@@ -1,6 +1,6 @@
 #include "getdns_dnssec.h"
-#include "../getdns/getdns.h"
-#include "../getdns/getdns_extra.h"
+#include <getdns/getdns.h>
+#include <getdns/getdns_extra.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

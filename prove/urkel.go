@@ -66,7 +66,7 @@ func verifyUrkelExt(extensionValue []byte, domain string, roots []sync.BlockInfo
 			}
 		}
 		extensionValue = extensionValue[32+*length:]
-		log.Printf("could not find tree root %s from the certificate in the stored roots")
+		log.Printf("could not find tree root %s from the certificate in the stored roots", hexstr)
 	}
 	return fmt.Errorf("could not find tree root in the stored ones")
 }

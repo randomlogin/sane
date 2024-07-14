@@ -1,9 +1,8 @@
 package prove
 
 /*
-#include "getdns_dnssec.h"
 #include <getdns/getdns.h>
-#cgo LDFLAGS: -L/usr/local/lib -lgetdns
+#include "getdns_dnssec.h"
 */
 import "C"
 import (
@@ -16,7 +15,6 @@ func GetdnsVerifyChain(recordWire []byte) error {
 	dnsRecordWirePtr := (*C.uint8_t)(unsafe.Pointer(&recordWire[0]))
 	result_code := C.validate_dnssec(dnsRecordWirePtr, C.size_t(len(recordWire)))
 	switch result_code {
-
 	case C.GETDNS_DNSSEC_SECURE:
 		return nil
 	case C.GETDNS_DNSSEC_BOGUS:

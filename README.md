@@ -17,24 +17,43 @@ Internal hnsd daemon has `5350` as a default port.
 
 ## Install
 
-Dependencies:
+### Ubuntu
+
+Install dependencies:
 ```
 apt-get install libgetdns-dev
 ```
 
-Actual build
+Build:
 
 ```
 git clone https://github.com/randomlogin/sane.git && cd sane/cmd/sane
 go build 
 ```
 
-Next, in order to use SANE it's needed to have [hnsd](https://github.com/handshake-org/hnsd) installed. 
+Next, in order to use SANE it's needed to have [hnsd](https://github.com/handshake-org/hnsd) installed. Please, follow
+build instraction in hnsd repository.
+
 One can provide the path to the `hnsd` executable either via flag `-hnsd` or via environment variable 
 
 `export HNSD_PATH="~/hnsd/hnsd"`
 
 Default directory containing CA files and saved tree roots is `~/.sane/`.
+
+### Windows
+
+Windows users are encouraged to use docker container to run sane.
+
+### Docker
+
+SANE can be run as a docker container:
+1. Build container `docker build .`
+4. Run sane `sudo dicker run -p 9590:9590 sane -r https://hnsdoh.com -external-service https://sdaneproofs.htools.work/proofs/ --verbose -addr 0.0.0.0:9590`
+2. Copy the generated certificate from the container:
+`sudo docker cp $(sudo docker ps | grep sane | awk '{print $1}'):/root/.sane/cert.crt cert.crt`
+3. Perhaps you also will need to change permissions to the certificate: `sudo chown $(whoami) cert.crt` to add them to
+   your browser
+
 
 ## Usage
 
@@ -73,8 +92,8 @@ Another extension from the certificate contains DNSSEC verifiation chain. Its ve
 - Import the certificate file into your browser certificate store ([Firefox example](https://user-images.githubusercontent.com/41967894/117558164-a7cb4480-b02f-11eb-93ed-678f81f25f2e.png)).
 
 ### Requirements
-Go 1.21+ is required. \
-hnsd 2.99.0+ is required.
+Go 1.21+  \
+hnsd 2.99.0+ 
 
 ### Example websites
 
