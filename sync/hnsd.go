@@ -70,24 +70,20 @@ func CheckHNSDVersion() error {
 }
 
 // checks if hnsd has synced all blocks in order to kill the subprocess
-// does it by invoking hesoid DNS request which
+// does it by invoking hesiod DNS request which
 // TODO export params
 func checkIfSynced() (bool, error) {
 	msg := new(dns.Msg)
 	msg.SetQuestion(dns.Fqdn(qname), dns.StringToType[qtype])
 	msg.SetEdns0(4096, true)
-
 	msg.Question[0].Qclass = dns.StringToClass[qclass]
 
-	// Use the net package to send the DNS query with a timeout
 	client := new(dns.Client)
-	// client.Timeout = dnsTimeout
 	response, _, err := client.Exchange(msg, dnsAddress)
 	if err != nil {
 		return false, fmt.Errorf("DNS query failed: %v", err)
 	}
 
-	// Check the DNS response for synchronization status
 	if len(response.Answer) > 0 {
 		if txtRecord, ok := response.Answer[0].(*dns.TXT); ok {
 			if txtRecord.Txt[0] == "true" {
@@ -99,13 +95,6 @@ func checkIfSynced() (bool, error) {
 	}
 
 	return false, nil
-}
-
-func PeriodicallySync(interval time.Duration, pathToExecutable, confPath, pathToCheckpoint string) {
-	for {
-		GetRoots(pathToExecutable, confPath, pathToCheckpoint)
-		time.Sleep(interval)
-	}
 }
 
 func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string) {
@@ -170,7 +159,8 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 			}
 
 			if cmd.Process != nil && isSynced {
-				if err := cmd.Process.Signal(syscall.SIGINT); err != nil {
+				// if err := cmd.Process.Signal(syscall.SIGINT); err != nil {
+				if err := cmd.Process.Kill(); err != nil {
 					log.Fatal("Error killing hnsd: ", err)
 				}
 

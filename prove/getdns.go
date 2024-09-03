@@ -3,6 +3,9 @@ package prove
 /*
 #include <getdns/getdns.h>
 #include "getdns_dnssec.h"
+#cgo LDFLAGS: -lgetdns
+#cgo LDFLAGS: "-L/usr/local/lib"
+#cgo CFLAGS: "-I/usr/local/include/getdns"
 */
 import "C"
 import (
