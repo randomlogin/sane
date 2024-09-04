@@ -14,16 +14,20 @@ checkpoints, hnsd has to syncrhonize last ~2k roots which usually takes 5 second
 
 Internal hnsd daemon has `5350` as a default port.
 
-## Install
-
-### Ubuntu
+## Build from source
 
 Install dependencies:
+
+#### Ubuntu 
 ```
 apt-get install libgetdns-dev
 ```
+#### macOS
+```
+brew install getdns
+```
 
-Build:
+### Build:
 
 ```
 git clone https://github.com/randomlogin/sane.git && cd sane/cmd/sane
@@ -76,11 +80,6 @@ Additional arguments can be viewed by invoking help:
 ./sane --help
 ```
 
-There are several public community-hosted external services: 
-- https://sdaneproofs.htools.work/proofs/ (@rithvikvibhu)
-- https://sdaneproofs.woodburn.au/proofs (@nathanwoodburn)
-- https://sdaneproofs.shakestation.io/proofs 
-
 ### Urkel tree
 SANE looks for an extension in the certificate which contains an urkel tree proof, verifies it, checks if the root is not
 older than a week.\
@@ -92,7 +91,12 @@ Another extension from the certificate contains DNSSEC verifiation chain. Its ve
 
 ### External service
 
-It allows the owner of the website not to update their ceritificate each week with the new proofs, but
+Uses an external service for providing the proof data. 
+
+There are several public community-hosted external services: 
+- https://sdaneproofs.htools.work/proofs/ ([@rithvikvibhu](https://www.github.com/rithvikvibhu))
+- https://sdaneproofs.woodburn.au/proofs ([@nathanwoodburn](https://www.github.com/nathanwoodburn))
+- https://sdaneproofs.shakestation.io/proofs 
 
 
 ### Browser settings
