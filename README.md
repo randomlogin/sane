@@ -10,8 +10,7 @@ is correct and then outputs a self-signed certificate (signed by local certifica
 
 ### hnsd 
 Internally it uses hnsd to sync tree roots. The initial syncronization might take several minutes. Afterwards, using
-checkpoints, hnsd has to syncrhonize last ~2k roots which usually takes 5 seconds. After synchronization, hnsd is
-terminated.
+checkpoints, hnsd has to syncrhonize last ~2k roots which usually takes 5 seconds. After synchronization, hnsd is terminated.
 
 Internal hnsd daemon has `5350` as a default port.
 
@@ -77,6 +76,11 @@ Additional arguments can be viewed by invoking help:
 ./sane --help
 ```
 
+There are several public community-hosted external services: 
+- https://sdaneproofs.htools.work/proofs/ (@rithvikvibhu)
+- https://sdaneproofs.woodburn.au/proofs (@nathanwoodburn)
+- https://sdaneproofs.shakestation.io/proofs 
+
 ### Urkel tree
 SANE looks for an extension in the certificate which contains an urkel tree proof, verifies it, checks if the root is not
 older than a week.\
@@ -85,6 +89,10 @@ Native [golang implementation of urkel tree](https://github.com/nodech/go-hsd-ut
 ### DNSSEC
 Another extension from the certificate contains DNSSEC verifiation chain. Its verification is done locally using
 [getdns](https://getdnsapi.net/), it does not call any resolvers.
+
+### External service
+
+It allows the owner of the website not to update their ceritificate each week with the new proofs, but
 
 
 ### Browser settings

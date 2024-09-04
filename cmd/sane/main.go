@@ -43,7 +43,7 @@ var (
 	hnsdPath           = flag.String("hnsd", os.Getenv("HNSD_PATH"), "path to hnsd executable, also may be set as environment variable HNSD_PATH")
 	hnsdCheckpointPath = flag.String("checkpoint", "", "path to hnsd checkpoint location, default ~/.hnsd")
 	resyncInterval     = flag.Duration("resync-interval", 24*time.Hour, "interval for roots resyncronization")
-	externalService    = flag.String("external-service", "", "uri to an external service providing SANE data, can be a comma-separated list")
+	externalService    = flag.String("external-service", "", "uri to an external service providing SANE data, comma-separated list of URIs")
 )
 
 func getConfPath() string {
