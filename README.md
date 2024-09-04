@@ -14,7 +14,7 @@ checkpoints, hnsd has to syncrhonize last ~2k roots which usually takes 5 second
 
 Internal hnsd daemon has `5350` as a default port.
 
-## Build from source
+## Usage
 
 Install dependencies:
 
@@ -27,7 +27,7 @@ apt-get install libgetdns-dev
 brew install getdns
 ```
 
-### Build:
+### Build from source:
 
 ```
 git clone https://github.com/randomlogin/sane.git && cd sane/cmd/sane
