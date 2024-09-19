@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -222,11 +223,12 @@ func main() {
 		log.Fatal("path to hnsd is not provided")
 	}
 
-	sync.GetRoots(*hnsdPath, p, *hnsdCheckpointPath)
+	ctx := context.Background()
+	sync.GetRoots(ctx, *hnsdPath, p, *hnsdCheckpointPath)
 	go func() {
 		for {
 			time.Sleep(*resyncInterval)
-			sync.GetRoots(*hnsdPath, p, *hnsdCheckpointPath)
+			sync.GetRoots(ctx, *hnsdPath, p, *hnsdCheckpointPath)
 		}
 	}()
 

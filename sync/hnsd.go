@@ -97,7 +97,7 @@ func checkIfSynced() (bool, error) {
 	return false, nil
 }
 
-func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string) {
+func GetRoots(ctx context.Context, pathToExecutable string, confPath string, pathToCheckpoint string) {
 	if pathToCheckpoint == "" {
 		home, _ := os.UserHomeDir() //above already fails if it doesn't exist
 		pathToCheckpoint = path.Join(home, ".hnsd")
@@ -116,7 +116,6 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 		log.Fatal(err)
 	}
 
-	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(ctx, pathToExecutable, "-n", dnsAddress, "-p", "4", "-r", "127.0.0.1:12345", "-t", "-x", pathToCheckpoint)
 	defer cancel()
@@ -146,6 +145,7 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 	slidingWindow := make([]BlockInfo, 0, BlocksToStore)
 
 	// Run a goroutine to handle process termination and write to file
+	//TODO: refactor
 	go func() {
 		var isSynced bool
 		for {
@@ -155,6 +155,7 @@ func GetRoots(pathToExecutable string, confPath string, pathToCheckpoint string)
 				isSynced, err = checkIfSynced()
 				if err != nil {
 					log.Printf("Error checking synchronization: %v", err)
+					break
 				}
 			}
 
